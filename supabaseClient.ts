@@ -15,4 +15,8 @@ if (!supabaseUrl || !supabaseKey) {
 
 console.log('✅ Creando cliente de Supabase...');
 export const supabase = createClient(supabaseUrl, supabaseKey);
+<<<<<<< HEAD
 console.log('✅ Cliente de Supabase creado correctamente');
+=======
+console.log('✅ Cliente de Supabase creado correctamente');
+>>>>>>> b568966112bdd4c7aebaa11be64b9d7a01b57558
