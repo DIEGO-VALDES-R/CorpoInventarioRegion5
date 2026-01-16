@@ -77,7 +77,7 @@ export const INITIAL_PRODUCTS: Product[] = [
 ];
 
 export const INITIAL_USERS: User[] = [
-    { id: 'u1', username: 'admin', password: 'admin', name: 'Administrador Principal', role: 'admin' },
+    { id: 'u1', username: 'admin', password: 'admin5', name: 'Administrador Principal', role: 'admin' },
     { id: 'u2', username: 'visitante', password: '123', name: 'Usuario Vista', role: 'viewer' }
 ];
 
