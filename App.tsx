@@ -113,7 +113,7 @@ const LoginScreen = ({ onLogin, users }: { onLogin: (u: User) => void, users: Us
                         Ingresar
                     </button>
                     <div className="text-xs text-center text-slate-400 mt-4">
-                        Demo: admin/admin o visitante/123
+                        Demo: usuario/clave o visitante/123
                     </div>
                 </form>
             </div>
