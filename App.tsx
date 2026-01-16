@@ -86,7 +86,7 @@ const LoginScreen = ({ onLogin, users }: { onLogin: (u: User) => void, users: Us
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mb-4">
                         <Package size={32} />
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-900">CorpInventario</h1>
+                    <h1 className="text-2xl font-bold text-slate-900">SIGIR5</h1>
                     <p className="text-slate-500">Sistema con Supabase</p>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
