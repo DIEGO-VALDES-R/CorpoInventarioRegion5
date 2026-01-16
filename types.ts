@@ -31,6 +31,7 @@ export interface Product {
   expirationDate?: string;
   status: ProductStatus;
   location?: string;
+  supplier?: string; // Nuevo campo para Abastecimiento
 }
 
 export enum TransactionType {

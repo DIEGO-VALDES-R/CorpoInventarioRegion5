@@ -1,5 +1,5 @@
 {
-  "name": "CorpInventario",
-  "description": "Sistema de gestión de inventario interno con alertas de stock, vencimientos, control de bajas y generación de reportes.",
+  "name": "SGI Abastecimiento",
+  "description": "Sistema de Gestión de Inventario para Abastecimiento, control de EPPs, herramientas y materiales.",
   "requestFramePermissions": []
 }

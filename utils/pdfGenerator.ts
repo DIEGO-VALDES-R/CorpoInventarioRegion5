@@ -3,15 +3,15 @@ import autoTable from 'jspdf-autotable';
 import { Product, Category, Transaction } from '../types';
 import { CURRENCY_SYMBOL } from '../constants';
 
-// --- Existing Inventory PDF ---
+// --- Inventory PDF ---
 export const generateInventoryPDF = (products: Product[], categories: Category[]) => {
   const doc: any = new jsPDF();
   const today = new Date().toLocaleDateString();
 
   doc.setFontSize(20);
-  doc.text('Reporte de Inventario General', 14, 22);
+  doc.text('Inventario General de Abastecimiento', 14, 22);
   doc.setFontSize(10);
-  doc.text(`Fecha: ${today}`, 14, 30);
+  doc.text(`Fecha de Corte: ${today}`, 14, 30);
 
   let finalY = 40;
 
@@ -23,47 +23,46 @@ export const generateInventoryPDF = (products: Product[], categories: Category[]
       doc.text(cat.name, 14, finalY + 10);
       
       const tableData = catProducts.map(p => {
-        const difference = p.initialStock - p.stock;
         return [
             p.code,
             p.name,
-            p.initialStock,
+            p.supplier || '-', // Added supplier
             p.stock,
-            difference,
             p.unit,
             `${CURRENCY_SYMBOL}${p.price.toFixed(2)}`,
-            p.stock === 0 ? 'SIN STOCK' : (p.stock <= p.minStock ? 'BAJO' : 'OK')
+            p.location || '-',
+            p.stock === 0 ? 'AGOTADO' : (p.stock <= p.minStock ? 'CRÍTICO' : 'OK')
         ];
       });
 
       autoTable(doc, {
         startY: finalY + 15,
-        head: [['Código', 'Producto', 'Ini', 'Act', 'Dif', 'Unid.', 'Costo', 'Estado']],
+        head: [['Código', 'Material/Producto', 'Proveedor', 'Stock', 'Unid.', 'Costo', 'Ubic.', 'Estado']],
         body: tableData,
         theme: 'striped',
         headStyles: { fillColor: [52, 73, 94] },
-        styles: { fontSize: 8 },
+        styles: { fontSize: 7 },
         columnStyles: { 7: { fontStyle: 'bold' } },
         didParseCell: function(data: any) {
             if (data.section === 'body' && data.column.index === 7) {
-                 if (data.cell.raw === 'SIN STOCK') data.cell.styles.textColor = [0, 0, 0];
-                 else if (data.cell.raw === 'BAJO') data.cell.styles.textColor = [231, 76, 60];
+                 if (data.cell.raw === 'AGOTADO') data.cell.styles.textColor = [0, 0, 0];
+                 else if (data.cell.raw === 'CRÍTICO') data.cell.styles.textColor = [231, 76, 60];
             }
         }
       });
       finalY = doc.lastAutoTable.finalY + 5;
     }
   });
-  doc.save(`Inventario_${new Date().toISOString().split('T')[0]}.pdf`);
+  doc.save(`Inventario_Abastecimiento_${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
-// --- New: Transaction History PDF ---
+// --- Transaction History PDF ---
 export const generateTransactionHistoryPDF = (transactions: Transaction[]) => {
     const doc: any = new jsPDF();
     const today = new Date().toLocaleDateString();
 
     doc.setFontSize(18);
-    doc.text('Historial de Salidas y Bajas', 14, 22);
+    doc.text('Reporte de Movimientos / Despachos', 14, 22);
     doc.setFontSize(10);
     doc.text(`Generado el: ${today}`, 14, 30);
 
@@ -79,17 +78,17 @@ export const generateTransactionHistoryPDF = (transactions: Transaction[]) => {
 
     autoTable(doc, {
         startY: 40,
-        head: [['Fecha/Hora', 'Producto', 'Cant.', 'Motivo', 'Destino', 'Recibe', 'Registró']],
+        head: [['Fecha', 'Material', 'Cant.', 'Motivo/Obra', 'Destino', 'Receptor', 'Resp.']],
         body: tableData,
         theme: 'grid',
         headStyles: { fillColor: [192, 57, 43] }, // Red header for exits
         styles: { fontSize: 8 },
     });
 
-    doc.save(`Historial_Salidas_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`Despachos_${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
-// --- New: Replenishment Order PDF ---
+// --- Replenishment Order PDF ---
 export const generateReplenishmentPDF = (products: Product[]) => {
     const doc: any = new jsPDF();
     const today = new Date().toLocaleDateString();
@@ -98,17 +97,18 @@ export const generateReplenishmentPDF = (products: Product[]) => {
     const toOrder = products.filter(p => p.stock <= p.minStock);
 
     doc.setFontSize(18);
-    doc.text('Orden de Pedido Sugerida', 14, 22);
+    doc.text('Solicitud de Compra / Reposición', 14, 22);
     doc.setFontSize(10);
     doc.text(`Fecha: ${today}`, 14, 30);
-    doc.text('Lista de productos con stock crítico o agotado.', 14, 35);
+    doc.text('Listado de materiales bajo stock mínimo.', 14, 35);
 
     const tableData = toOrder.map(p => {
-        const suggested = (p.minStock * 2) - p.stock; // Simple logic: restock to 2x min
+        const suggested = (p.minStock * 2) - p.stock; 
         return [
             p.code,
             p.name,
-            p.stock === 0 ? 'AGOTADO' : p.stock,
+            p.supplier || 'No Asignado',
+            p.stock,
             p.minStock,
             suggested > 0 ? suggested : 0,
             p.unit
@@ -117,15 +117,15 @@ export const generateReplenishmentPDF = (products: Product[]) => {
 
     autoTable(doc, {
         startY: 45,
-        head: [['Código', 'Producto', 'Stock Actual', 'Min.', 'Sugerido', 'Unidad']],
+        head: [['Código', 'Material', 'Proveedor Sugerido', 'Actual', 'Min.', 'A Pedir', 'Unid']],
         body: tableData,
         theme: 'striped',
         headStyles: { fillColor: [243, 156, 18] }, // Orange/Yellow header
         styles: { fontSize: 9 },
         columnStyles: {
-            2: { fontStyle: 'bold', textColor: [231, 76, 60] }
+            3: { fontStyle: 'bold', textColor: [231, 76, 60] }
         }
     });
 
-    doc.save(`Pedido_Reposicion_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`Solicitud_Compra_${new Date().toISOString().split('T')[0]}.pdf`);
 };
