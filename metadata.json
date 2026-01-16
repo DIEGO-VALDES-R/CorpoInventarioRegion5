@@ -1,5 +1,7 @@
 {
   "name": "SGI Abastecimiento",
   "description": "Sistema de Gestión de Inventario para Abastecimiento, control de EPPs, herramientas y materiales.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera"
+  ]
 }

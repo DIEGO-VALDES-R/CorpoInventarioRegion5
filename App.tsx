@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   LayoutDashboard, 
   Package, 
@@ -21,7 +21,9 @@ import {
   ShoppingCart,
   ClipboardList,
   Truck,
-  HardHat
+  HardHat,
+  ScanBarcode,
+  X
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -32,6 +34,7 @@ import {
   Tooltip, 
   ResponsiveContainer
 } from 'recharts';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, EXPIRATION_WARNING_DAYS, INITIAL_USERS, PREDEFINED_PRODUCTS } from './constants';
 import { Product, Category, Transaction, TransactionType, AlertLevel, ProductStatus, User, UserRole } from './types';
 import { generateInventoryPDF, generateTransactionHistoryPDF, generateReplenishmentPDF } from './utils/pdfGenerator';
@@ -60,6 +63,71 @@ const getAlertLevel = (product: Product): AlertLevel => {
 };
 
 // --- Components ---
+
+// --- Scanner Component ---
+const ScannerModal = ({ isOpen, onClose, onScanSuccess }: { isOpen: boolean, onClose: () => void, onScanSuccess: (text: string) => void }) => {
+    const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+
+    useEffect(() => {
+        if (isOpen && !scannerRef.current) {
+            // Initialize scanner
+            const scanner = new Html5QrcodeScanner(
+                "reader",
+                { 
+                    fps: 10, 
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0
+                },
+                /* verbose= */ false
+            );
+            
+            scanner.render(
+                (decodedText) => {
+                    // Success callback
+                    onScanSuccess(decodedText);
+                    scanner.clear().catch(err => console.error("Failed to clear scanner", err));
+                    scannerRef.current = null;
+                    onClose();
+                },
+                (errorMessage) => {
+                    // Error callback (scanning in progress, usually ignored)
+                }
+            );
+            scannerRef.current = scanner;
+        }
+
+        // Cleanup function
+        return () => {
+            if (scannerRef.current) {
+                scannerRef.current.clear().catch(error => {
+                    console.error("Failed to clear html5-qrcode scanner during cleanup", error);
+                });
+                scannerRef.current = null;
+            }
+        };
+    }, [isOpen, onScanSuccess, onClose]);
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col relative">
+                <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                        <ScanBarcode size={20}/> Escanear Código
+                    </h3>
+                    <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+                        <X size={24} />
+                    </button>
+                </div>
+                <div className="p-4 bg-black">
+                     <div id="reader" className="w-full bg-white rounded-lg overflow-hidden"></div>
+                     <p className="text-center text-slate-400 text-sm mt-4">Apunte la cámara al código de barras o QR</p>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const LoginScreen = ({ onLogin, users }: { onLogin: (u: User) => void, users: User[] }) => {
     const [username, setUsername] = useState('');
@@ -341,6 +409,8 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
         supplier: '',
         location: ''
     });
+    
+    const [scannerOpen, setScannerOpen] = useState(false);
 
     useEffect(() => {
         if (product) {
@@ -372,6 +442,10 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
         setFormData(prev => ({ ...prev, categoryId: catId }));
     };
 
+    const handleScanResult = (code: string) => {
+        handleChange('code', code);
+    };
+
     const suggestions = formData.categoryId ? PREDEFINED_PRODUCTS[formData.categoryId] || [] : [];
     const readOnly = userRole === 'viewer' || (!isEditMode && !!product);
 
@@ -401,9 +475,21 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Código Interno</label>
-                            <input disabled={readOnly} required type="text" className="w-full border-slate-300 rounded-lg p-2.5 text-sm border disabled:bg-slate-100" 
-                                value={formData.code || ''} onChange={e => handleChange('code', e.target.value)} />
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Código Interno / Barras</label>
+                            <div className="flex gap-2">
+                                <input disabled={readOnly} required type="text" className="w-full border-slate-300 rounded-lg p-2.5 text-sm border disabled:bg-slate-100" 
+                                    value={formData.code || ''} onChange={e => handleChange('code', e.target.value)} placeholder="Escanee o escriba..." />
+                                {!readOnly && (
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setScannerOpen(true)}
+                                        className="bg-slate-800 text-white p-2.5 rounded-lg hover:bg-slate-700 transition"
+                                        title="Escanear Código"
+                                    >
+                                        <ScanBarcode size={20} />
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -502,6 +588,11 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
                     )}
                 </form>
             </div>
+            <ScannerModal 
+                isOpen={scannerOpen} 
+                onClose={() => setScannerOpen(false)} 
+                onScanSuccess={handleScanResult} 
+            />
         </div>
     );
 };
@@ -527,6 +618,7 @@ const InventoryList = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [scannerOpen, setScannerOpen] = useState(false);
   
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -572,6 +664,10 @@ const InventoryList = ({
       setIsEditMode(true);
   };
 
+  const handleScanSearch = (code: string) => {
+      setSearchTerm(code);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -595,15 +691,24 @@ const InventoryList = ({
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
         {/* Filters */}
         <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col md:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input 
-                type="text" 
-                placeholder="Buscar por material, código o proveedor..." 
-                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="relative flex-1 w-full flex gap-2">
+             <div className="relative flex-1">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                    type="text" 
+                    placeholder="Buscar por material, código o proveedor..." 
+                    className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+             </div>
+             <button 
+                onClick={() => setScannerOpen(true)}
+                className="bg-slate-800 text-white p-2 rounded-lg hover:bg-slate-700 transition flex items-center justify-center"
+                title="Escanear Código"
+             >
+                <ScanBarcode size={20} />
+             </button>
           </div>
           <select 
             className="w-full md:w-64 py-2 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -707,6 +812,12 @@ const InventoryList = ({
               </button>
           </div>
       )}
+
+      <ScannerModal 
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScanSuccess={handleScanSearch}
+      />
     </div>
   );
 };
@@ -728,6 +839,7 @@ const WriteOffModule = ({
     const [destination, setDestination] = useState('');
     const [receiver, setReceiver] = useState('');
     const [notes, setNotes] = useState('');
+    const [scannerOpen, setScannerOpen] = useState(false);
 
     const selectedProduct = products.find(p => p.id === selectedId);
 
@@ -745,6 +857,15 @@ const WriteOffModule = ({
         }
     };
 
+    const handleScanResult = (code: string) => {
+        const prod = products.find(p => p.code === code);
+        if (prod) {
+            setSelectedId(prod.id);
+        } else {
+            alert(`Producto con código ${code} no encontrado.`);
+        }
+    };
+
     return (
         <div className="space-y-8">
             <div className="max-w-3xl mx-auto space-y-6">
@@ -756,17 +877,27 @@ const WriteOffModule = ({
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">Seleccionar Material</label>
-                            <select 
-                                className="w-full border-slate-200 rounded-lg p-3 text-slate-700 border focus:ring-2 focus:ring-blue-100 outline-none bg-white"
-                                value={selectedId}
-                                onChange={(e) => setSelectedId(e.target.value)}
-                                required
-                            >
-                                <option value="">-- Buscar en Inventario --</option>
-                                {products.filter(p => p.stock > 0).map(p => (
-                                    <option key={p.id} value={p.id}>{p.code} - {p.name} ({p.unit})</option>
-                                ))}
-                            </select>
+                            <div className="flex gap-2">
+                                <select 
+                                    className="w-full border-slate-200 rounded-lg p-3 text-slate-700 border focus:ring-2 focus:ring-blue-100 outline-none bg-white"
+                                    value={selectedId}
+                                    onChange={(e) => setSelectedId(e.target.value)}
+                                    required
+                                >
+                                    <option value="">-- Buscar en Inventario --</option>
+                                    {products.filter(p => p.stock > 0).map(p => (
+                                        <option key={p.id} value={p.id}>{p.code} - {p.name} ({p.unit})</option>
+                                    ))}
+                                </select>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setScannerOpen(true)}
+                                    className="bg-slate-800 text-white p-3 rounded-lg hover:bg-slate-700 transition"
+                                    title="Escanear Material"
+                                >
+                                    <ScanBarcode size={24} />
+                                </button>
+                            </div>
                         </div>
 
                         {selectedProduct && (
@@ -906,6 +1037,12 @@ const WriteOffModule = ({
                     </div>
                 </div>
             </div>
+            
+            <ScannerModal 
+                isOpen={scannerOpen}
+                onClose={() => setScannerOpen(false)}
+                onScanSuccess={handleScanResult}
+            />
         </div>
     );
 };
