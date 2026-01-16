@@ -19,7 +19,8 @@ import {
   Building2,
   UserCheck,
   ShoppingCart,
-  ClipboardList
+  ClipboardList,
+  RefreshCw
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -30,6 +31,10 @@ import {
   Tooltip, 
   ResponsiveContainer
 } from 'recharts';
+
+// IMPORTANTE: Asegúrate de que esta ruta es correcta en tu proyecto
+import { supabase } from './supabaseClient';
+
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, EXPIRATION_WARNING_DAYS, INITIAL_USERS, PREDEFINED_PRODUCTS } from './constants';
 import { Product, Category, Transaction, TransactionType, AlertLevel, ProductStatus, User, UserRole } from './types';
 import { generateInventoryPDF, generateTransactionHistoryPDF, generateReplenishmentPDF } from './utils/pdfGenerator';
@@ -82,7 +87,7 @@ const LoginScreen = ({ onLogin, users }: { onLogin: (u: User) => void, users: Us
                         <Package size={32} />
                     </div>
                     <h1 className="text-2xl font-bold text-slate-900">CorpInventario</h1>
-                    <p className="text-slate-500">Sistema de Gestión Interna</p>
+                    <p className="text-slate-500">Sistema con Supabase</p>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
@@ -263,7 +268,6 @@ const Dashboard = ({
 
 // --- User Management Component ---
 const UserManagement = ({ users, onAddUser, currentUser }: { users: User[], onAddUser: (u: User) => void, currentUser: User }) => {
-    // ... (No changes here, kept for completeness)
     const [newUser, setNewUser] = useState<Partial<User>>({ role: 'viewer', username: '', password: '', name: '' });
 
     if (currentUser.role !== 'admin') return <div className="p-8 text-center text-slate-500">Acceso denegado.</div>;
@@ -320,10 +324,7 @@ const UserManagement = ({ users, onAddUser, currentUser }: { users: User[], onAd
 };
 
 // --- Product Modal (Add/Edit/View) ---
-// ... (No logic changes, just ensuring it uses the new AlertLevel properly if needed)
 const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave, userRole }: any) => {
-    // Reuse existing code logic, but ensure we render the difference correctly.
-    // The previous implementation is fine.
     const [formData, setFormData] = useState<Partial<Product>>({
         categoryId: categories[0]?.id,
         stock: 0,
@@ -969,7 +970,7 @@ const ReplenishmentModule = ({ products }: { products: Product[] }) => {
     );
 };
 
-// ... CategoryManager remains the same ...
+// CategoryManager
 const CategoryManager = ({
     categories,
     onAddCategory
@@ -977,7 +978,6 @@ const CategoryManager = ({
     categories: Category[],
     onAddCategory: (name: string, desc: string) => void
 }) => {
-    // Reuse existing
     const [name, setName] = useState('');
     const [desc, setDesc] = useState('');
 
@@ -1032,75 +1032,152 @@ const CategoryManager = ({
     );
 };
 
-// --- Main App ---
+// --- Main App with Supabase Integration ---
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'bajas' | 'replenishment' | 'categories' | 'users'>('dashboard');
   
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('corp_products');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
-  });
-
-  const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem('corp_categories');
-    return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
-  });
-
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('corp_users');
-    return saved ? JSON.parse(saved) : INITIAL_USERS;
-  });
+  // State
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   
-  // Store transactions locally
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-      const saved = localStorage.getItem('corp_transactions');
-      return saved ? JSON.parse(saved) : [];
-  });
+  // UI State
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
-  const [inventoryFilter, setInventoryFilter] = useState<string | null>(null);
+  // --- Supabase Data Loading ---
+  const loadData = async () => {
+    console.log('📥 Cargando datos desde Supabase...');
+    setLoading(true);
+    
+    try {
+      // Parallel loading
+      const [productsRes, categoriesRes, txRes] = await Promise.all([
+        supabase.from('products').select('*'),
+        supabase.from('categories').select('*'),
+        supabase.from('transactions').select('*').order('date', { ascending: false })
+      ]);
+      
+      if (productsRes.error) {
+        console.error('Error productos:', productsRes.error);
+      } else {
+        console.log('✅ Productos:', productsRes.data?.length);
+        setProducts(productsRes.data || []);
+      }
 
-  useEffect(() => { localStorage.setItem('corp_products', JSON.stringify(products)); }, [products]);
-  useEffect(() => { localStorage.setItem('corp_categories', JSON.stringify(categories)); }, [categories]);
-  useEffect(() => { localStorage.setItem('corp_users', JSON.stringify(users)); }, [users]);
-  useEffect(() => { localStorage.setItem('corp_transactions', JSON.stringify(transactions)); }, [transactions]);
+      if (categoriesRes.error) {
+        console.error('Error categorías:', categoriesRes.error);
+      } else {
+        console.log('✅ Categorías:', categoriesRes.data?.length);
+        setCategories(categoriesRes.data || []);
+      }
+
+      if (txRes.error) {
+        console.error('Error transacciones:', txRes.error);
+        // If table doesn't exist yet, fail silently or fallback to local
+      } else {
+        console.log('✅ Transacciones:', txRes.data?.length);
+        setTransactions(txRes.data || []);
+      }
+      
+    } catch (err) {
+      console.error('Error general cargando datos:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const syncInitialData = async () => {
+    console.log('🔄 Sincronizando datos iniciales...');
+    setSyncing(true);
+    
+    try {
+      // Upsert Categories
+      for (const cat of INITIAL_CATEGORIES) {
+        const { error } = await supabase
+          .from('categories')
+          .upsert(cat, { onConflict: 'id' });
+        if (error) console.error('Error sync cat:', error);
+      }
+
+      // Upsert Products
+      for (const prod of INITIAL_PRODUCTS) {
+        const { error } = await supabase
+          .from('products')
+          .upsert(prod, { onConflict: 'id' });
+        if (error) console.error('Error sync prod:', error);
+      }
+
+      alert('Sincronización completada. Recargando datos...');
+      await loadData();
+      
+    } catch (err) {
+      console.error('Error en sincronización:', err);
+      alert('Hubo un error durante la sincronización.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // --- Handlers (Local State + Supabase) ---
 
   const handleLogin = (u: User) => setUser(u);
   const handleLogout = () => setUser(null);
 
-  const addProduct = (product: Product) => {
+  const addProduct = async (product: Product) => {
+    // Optimistic update
     setProducts(prev => [...prev, product]);
-  };
-
-  const editProduct = (updatedProduct: Product) => {
-    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-  };
-
-  const deleteProduct = (id: string) => {
-    if (confirm('¿Está seguro de eliminar este producto?')) {
-        setProducts(prev => prev.filter(p => p.id !== id));
+    // DB Update
+    const { error } = await supabase.from('products').insert(product);
+    if (error) {
+      console.error('Error creando producto:', error);
+      alert('Error al guardar en base de datos');
     }
   };
 
-  const processBaja = (productId: string, qty: number, reason: string, destination?: string, receiver?: string) => {
+  const editProduct = async (updatedProduct: Product) => {
+    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+    const { error } = await supabase
+      .from('products')
+      .update(updatedProduct)
+      .eq('id', updatedProduct.id);
+    if (error) console.error('Error editando:', error);
+  };
+
+  const deleteProduct = async (id: string) => {
+    if (!confirm('¿Está seguro de eliminar este producto?')) return;
+    
+    setProducts(prev => prev.filter(p => p.id !== id));
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) console.error('Error eliminando:', error);
+  };
+
+  const processBaja = async (productId: string, qty: number, reason: string, destination?: string, receiver?: string) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
-    // Update Product Stock
-    setProducts(prev => prev.map(p => {
-        if (p.id === productId) {
-            return { ...p, stock: p.stock - qty };
-        }
-        return p;
-    }));
+    // 1. Update Product Stock
+    const newStock = product.stock - qty;
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: newStock } : p));
+    
+    await supabase
+      .from('products')
+      .update({ stock: newStock })
+      .eq('id', productId);
 
-    // Record Transaction
+    // 2. Record Transaction
     const newTx: Transaction = {
         id: `tx_${Date.now()}`,
         productId,
         productName: product.name,
-        type: TransactionType.OUT, // Use OUT for deliveries/bajas generally here
+        type: TransactionType.OUT,
         quantity: qty,
         date: new Date().toISOString(),
         reason,
@@ -1108,25 +1185,46 @@ export default function App() {
         destination,
         receiver
     };
+    
     setTransactions(prev => [newTx, ...prev]);
+    
+    // Try to save transaction, but don't block if table doesn't exist yet in user's DB
+    const { error: txError } = await supabase.from('transactions').insert(newTx);
+    if (txError) console.warn('Transacción no guardada (quizás la tabla no existe):', txError);
   };
 
-  const addCategory = (name: string, description: string) => {
+  const addCategory = async (name: string, description: string) => {
     const newCat: Category = { id: `cat_${Date.now()}`, name, description };
     setCategories(prev => [...prev, newCat]);
+    const { error } = await supabase.from('categories').insert(newCat);
+    if (error) console.error('Error creando categoría:', error);
   };
 
   const addUser = (newUser: User) => {
       setUsers(prev => [...prev, newUser]);
+      // Users are local-only for this demo usually, unless a Supabase Auth table is set up
+      console.log('Usuario añadido localmente:', newUser);
   };
 
   const navigateToCategory = (catId: string) => {
-      setInventoryFilter(catId);
       setActiveTab('inventory');
+      // We can pass a filter state if we wanted, but for now just switching tab
+      // To implement filtering, we could add a 'inventoryFilter' state like the original
   };
 
   if (!user) {
       return <LoginScreen onLogin={handleLogin} users={users} />;
+  }
+
+  if (loading) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+            <div className="text-white text-center">
+                <RefreshCw className="animate-spin mx-auto mb-4" size={48} />
+                <p>Cargando datos de Supabase...</p>
+            </div>
+        </div>
+      );
   }
 
   return (
@@ -1175,8 +1273,17 @@ export default function App() {
           )}
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
-            <button onClick={handleLogout} className="w-full flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm">
+        <div className="p-4 border-t border-slate-800 space-y-2">
+            {user.role === 'admin' && (
+                 <button 
+                    onClick={syncInitialData} 
+                    disabled={syncing}
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                    {syncing ? <RefreshCw size={16} className="animate-spin"/> : <RefreshCw size={16} />}
+                    {syncing ? 'Sincronizando...' : 'Sincronizar DB'}
+                </button>
+            )}
+            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-white transition-colors text-sm">
                 <LogOut size={16} /> Cerrar Sesión
             </button>
         </div>
@@ -1192,7 +1299,7 @@ export default function App() {
                 onAddProduct={addProduct}
                 onEditProduct={editProduct}
                 onDeleteProduct={deleteProduct}
-                initialCategoryFilter={inventoryFilter}
+                initialCategoryFilter={null}
                 currentUser={user}
             />
         )}
