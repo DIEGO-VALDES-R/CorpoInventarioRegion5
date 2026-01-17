@@ -20,7 +20,8 @@ import {
   UserCheck,
   ShoppingCart,
   ClipboardList,
-  RefreshCw
+  RefreshCw,
+  FileSpreadsheet
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -38,6 +39,12 @@ import { supabase } from './supabaseClient';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, EXPIRATION_WARNING_DAYS, INITIAL_USERS, PREDEFINED_PRODUCTS } from './constants';
 import { Product, Category, Transaction, TransactionType, AlertLevel, ProductStatus, User, UserRole } from './types';
 import { generateInventoryPDF, generateTransactionHistoryPDF, generateReplenishmentPDF } from './utils/pdfGenerator';
+import { 
+  generateInventoryExcel,
+  generateTransactionHistoryExcel,
+  generateReplenishmentExcel,
+  generateCompleteExcel
+} from './utils/excelGenerator';
 
 // --- Helper Functions ---
 
@@ -189,6 +196,20 @@ const Dashboard = ({
             <Calendar size={16} /> Vencidos / Por Vencer
           </div>
           <div className="text-2xl font-bold text-amber-700">{stats.expired + stats.expiringSoon}</div>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white shadow-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold mb-1">Reporte Integral</h3>
+            <p className="text-sm text-blue-100">Descarga todos los datos en un solo archivo Excel</p>
+          </div>
+          <button 
+            onClick={() => generateCompleteExcel(products, categories, [])} // Pasamos array vacío de transacciones si no se usan aqui o usar un prop
+            className="bg-white text-blue-600 px-6 py-3 rounded-lg flex items-center gap-2 font-bold hover:bg-blue-50 transition-colors shadow-lg">
+            <FileSpreadsheet size={20} /> Descargar Completo
+          </button>
         </div>
       </div>
 
@@ -559,12 +580,21 @@ const InventoryList = ({
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-800">Inventario General</h2>
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex gap-2 w-full md:w-auto flex-wrap">
+            {/* Botón PDF */}
             <button 
                 onClick={() => generateInventoryPDF(filteredProducts, categories)}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm font-medium">
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm font-medium shadow-md">
                 <FileDown size={18} /> PDF
             </button>
+            
+            {/* Botón Excel */}
+            <button 
+                onClick={() => generateInventoryExcel(filteredProducts, categories)}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm font-medium shadow-md">
+                <FileSpreadsheet size={18} /> Excel
+            </button>
+
             {currentUser.role === 'admin' && (
                 <button 
                     onClick={handleOpenCreate}
@@ -847,11 +877,18 @@ const WriteOffModule = ({
                         <ClipboardList className="text-slate-500" />
                         Historial de Salidas
                     </h2>
-                    <button 
-                        onClick={() => generateTransactionHistoryPDF(transactions)}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm font-medium">
-                        <FileDown size={18} /> Descargar Reporte
-                    </button>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => generateTransactionHistoryPDF(transactions)}
+                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm font-medium shadow-md">
+                            <FileDown size={18} /> PDF
+                        </button>
+                        <button 
+                            onClick={() => generateTransactionHistoryExcel(transactions)}
+                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm font-medium shadow-md">
+                            <FileSpreadsheet size={18} /> Excel
+                        </button>
+                    </div>
                 </div>
                 
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -905,12 +942,20 @@ const ReplenishmentModule = ({ products }: { products: Product[] }) => {
                     <ShoppingCart className="text-blue-600" />
                     Pedidos y Reabastecimiento
                 </h2>
-                <button 
-                    onClick={() => generateReplenishmentPDF(products)}
-                    disabled={neededProducts.length === 0}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm font-medium shadow-md shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <FileDown size={18} /> Descargar Orden
-                </button>
+                <div className="flex gap-2 flex-wrap">
+                    <button 
+                        onClick={() => generateReplenishmentPDF(products)}
+                        disabled={neededProducts.length === 0}
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
+                        <FileDown size={18} /> PDF
+                    </button>
+                    <button 
+                        onClick={() => generateReplenishmentExcel(products)}
+                        disabled={neededProducts.length === 0}
+                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
+                        <FileSpreadsheet size={18} /> Excel
+                    </button>
+                </div>
              </div>
 
              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
