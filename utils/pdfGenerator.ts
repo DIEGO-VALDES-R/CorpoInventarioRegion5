@@ -3,6 +3,9 @@ import autoTable from 'jspdf-autotable';
 import { Product, Category, Transaction } from '../types';
 import { CURRENCY_SYMBOL } from '../constants';
 
+// URL del escudo de la Policía Nacional
+const ESCUDO_POLICIA_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Escudo_Polic%C3%ADa_Nacional_de_Colombia.jpg/960px-Escudo_Polic%C3%ADa_Nacional_de_Colombia.jpg?20130228200107';
+
 // Colores corporativos
 const COLORS = {
   primary: [16, 185, 129],      // Emerald-600
@@ -11,28 +14,77 @@ const COLORS = {
   warning: [245, 158, 11],      // Amber-500
   success: [34, 197, 94],       // Green-500
   text: [51, 65, 85],           // Slate-700
-  lightGray: [241, 245, 249]    // Slate-100
+  lightGray: [241, 245, 249],   // Slate-100
+  policiaBlue: [0, 51, 102]     // Azul institucional Policía
 };
 
-// Función auxiliar para agregar header corporativo
-const addHeader = (doc: any, title: string, subtitle?: string) => {
+// Función para cargar imagen como Base64
+const loadImageAsBase64 = async (url: string): Promise<string> => {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('Error cargando imagen:', error);
+    return '';
+  }
+};
+
+// Función auxiliar para agregar header institucional con escudo
+const addHeader = async (doc: any, title: string, subtitle?: string) => {
   const pageWidth = doc.internal.pageSize.width;
   
-  // Rectángulo de fondo para el header
-  doc.setFillColor(...COLORS.primary);
-  doc.rect(0, 0, pageWidth, 35, 'F');
+  // Cargar escudo
+  const escudoBase64 = await loadImageAsBase64(ESCUDO_POLICIA_URL);
   
-  // Título principal
+  // Fondo azul institucional
+  doc.setFillColor(...COLORS.policiaBlue);
+  doc.rect(0, 0, pageWidth, 50, 'F');
+  
+  // Agregar escudo (izquierda)
+  if (escudoBase64) {
+    try {
+      doc.addImage(escudoBase64, 'JPEG', 14, 8, 20, 25);
+    } catch (error) {
+      console.error('Error agregando imagen:', error);
+    }
+  }
+  
+  // Texto institucional (centro)
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(20);
+  doc.setFontSize(9);
   doc.setFont(undefined, 'bold');
-  doc.text(title, 14, 18);
+  const centerX = pageWidth / 2;
+  
+  doc.text('MINISTERIO DE DEFENSA NACIONAL', centerX, 12, { align: 'center' });
+  doc.text('POLICÍA NACIONAL', centerX, 18, { align: 'center' });
+  doc.text('REGIÓN DE POLICÍA No. 5', centerX, 24, { align: 'center' });
+  doc.setFontSize(8);
+  doc.setFont(undefined, 'normal');
+  doc.text('LOGÍSTICA', centerX, 30, { align: 'center' });
+  
+  // Línea divisoria dorada
+  doc.setDrawColor(255, 215, 0); // Dorado
+  doc.setLineWidth(1);
+  doc.line(14, 52, pageWidth - 14, 52);
+  
+  // Título del reporte
+  doc.setTextColor(...COLORS.text);
+  doc.setFontSize(16);
+  doc.setFont(undefined, 'bold');
+  doc.text(title, centerX, 62, { align: 'center' });
   
   // Subtítulo
   if (subtitle) {
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    doc.text(subtitle, 14, 26);
+    doc.setTextColor(100, 100, 100);
+    doc.text(subtitle, centerX, 69, { align: 'center' });
   }
   
   // Fecha en la esquina derecha
@@ -41,14 +93,10 @@ const addHeader = (doc: any, title: string, subtitle?: string) => {
     month: 'long',
     day: 'numeric'
   });
-  doc.setFontSize(9);
-  const textWidth = doc.getTextWidth(today);
-  doc.text(today, pageWidth - textWidth - 14, 18);
-  
-  // Línea decorativa
-  doc.setDrawColor(...COLORS.secondary);
-  doc.setLineWidth(0.5);
-  doc.line(14, 38, pageWidth - 14, 38);
+  doc.setFontSize(8);
+  doc.setTextColor(...COLORS.text);
+  const textWidth = doc.getTextWidth(`Fecha: ${today}`);
+  doc.text(`Fecha: ${today}`, pageWidth - textWidth - 14, 62);
   
   // Reset color
   doc.setTextColor(...COLORS.text);
@@ -59,30 +107,43 @@ const addFooter = (doc: any, pageNumber: number, totalPages: number, additionalI
   const pageHeight = doc.internal.pageSize.height;
   const pageWidth = doc.internal.pageSize.width;
   
+  // Línea decorativa
   doc.setDrawColor(...COLORS.lightGray);
   doc.setLineWidth(0.5);
-  doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
+  doc.line(14, pageHeight - 20, pageWidth - 14, pageHeight - 20);
   
-  doc.setFontSize(8);
+  // Información institucional
+  doc.setFontSize(7);
   doc.setTextColor(100, 100, 100);
-  doc.text('CorpInventario - Sistema de Gestión', 14, pageHeight - 10);
+  doc.setFont(undefined, 'bold');
+  doc.text('POLICÍA NACIONAL - REGIÓN 5 - LOGÍSTICA', 14, pageHeight - 15);
   
+  // Información adicional
   if (additionalInfo) {
-    doc.text(additionalInfo, 14, pageHeight - 6);
+    doc.setFont(undefined, 'normal');
+    doc.text(additionalInfo, 14, pageHeight - 11);
   }
   
+  // Número de página
   const pageText = `Página ${pageNumber} de ${totalPages}`;
   const textWidth = doc.getTextWidth(pageText);
-  doc.text(pageText, pageWidth - textWidth - 14, pageHeight - 10);
+  doc.text(pageText, pageWidth - textWidth - 14, pageHeight - 15);
+  
+  // Línea de confidencialidad
+  doc.setFontSize(6);
+  doc.setTextColor(150, 150, 150);
+  const confidencial = 'Documento de uso oficial - Manejo confidencial';
+  const confWidth = doc.getTextWidth(confidencial);
+  doc.text(confidencial, (pageWidth - confWidth) / 2, pageHeight - 7);
 };
 
 // --- INVENTARIO MEJORADO ---
-export const generateInventoryPDF = (products: Product[], categories: Category[]) => {
+export const generateInventoryPDF = async (products: Product[], categories: Category[]) => {
   const doc: any = new jsPDF();
   
-  addHeader(doc, 'Reporte de Inventario General', 'Estado completo del inventario por categorías');
+  await addHeader(doc, 'Reporte de Inventario General', 'Estado completo del inventario por categorías');
   
-  let finalY = 45;
+  let finalY = 75;
   
   // Calcular totales
   const totalProducts = products.length;
@@ -129,15 +190,15 @@ export const generateInventoryPDF = (products: Product[], categories: Category[]
   finalY += 35;
   
   // Tablas por categoría
-  categories.forEach((cat, index) => {
+  for (const cat of categories) {
     const catProducts = products.filter(p => p.categoryId === cat.id);
-    if (catProducts.length === 0) return;
+    if (catProducts.length === 0) continue;
     
     // Verificar espacio para nueva categoría
-    if (finalY > doc.internal.pageSize.height - 60) {
+    if (finalY > doc.internal.pageSize.height - 80) {
       doc.addPage();
-      addHeader(doc, 'Reporte de Inventario General', 'Continuación');
-      finalY = 45;
+      await addHeader(doc, 'Reporte de Inventario General', 'Continuación');
+      finalY = 75;
     }
     
     // Título de categoría con badge
@@ -206,18 +267,18 @@ export const generateInventoryPDF = (products: Product[], categories: Category[]
             data.cell.styles.textColor = COLORS.success;
           }
         }
-        // Resaltar stock actual bajo
         if (data.section === 'body' && data.column.index === 3) {
           const stockValue = parseInt(data.cell.raw);
           if (stockValue === 0) {
             data.cell.styles.textColor = COLORS.danger;
           }
         }
-      }
+      },
+      margin: { bottom: 30 }
     });
     
     finalY = doc.lastAutoTable.finalY + 8;
-  });
+  }
   
   // Footer en todas las páginas
   const totalPages = doc.internal.pages.length - 1;
@@ -230,12 +291,12 @@ export const generateInventoryPDF = (products: Product[], categories: Category[]
 };
 
 // --- HISTORIAL DE TRANSACCIONES MEJORADO ---
-export const generateTransactionHistoryPDF = (transactions: Transaction[]) => {
+export const generateTransactionHistoryPDF = async (transactions: Transaction[]) => {
   const doc: any = new jsPDF();
   
-  addHeader(doc, 'Historial de Salidas y Bajas', 'Registro completo de movimientos de inventario');
+  await addHeader(doc, 'Historial de Salidas y Bajas', 'Registro completo de movimientos de inventario');
   
-  let finalY = 45;
+  let finalY = 75;
   
   // Resumen de transacciones
   const totalQty = transactions.reduce((sum, t) => sum + t.quantity, 0);
@@ -301,7 +362,8 @@ export const generateTransactionHistoryPDF = (transactions: Transaction[]) => {
       5: { cellWidth: 25 },
       6: { cellWidth: 25 },
       7: { cellWidth: 20, fontSize: 7 }
-    }
+    },
+    margin: { bottom: 30 }
   });
   
   const totalPages = doc.internal.pages.length - 1;
@@ -314,14 +376,14 @@ export const generateTransactionHistoryPDF = (transactions: Transaction[]) => {
 };
 
 // --- ORDEN DE REPOSICIÓN MEJORADA ---
-export const generateReplenishmentPDF = (products: Product[]) => {
+export const generateReplenishmentPDF = async (products: Product[]) => {
   const doc: any = new jsPDF();
   
   const toOrder = products.filter(p => p.stock <= p.minStock);
   
-  addHeader(doc, 'Orden de Pedido Sugerida', 'Productos con stock crítico que requieren reposición');
+  await addHeader(doc, 'Orden de Pedido Sugerida', 'Productos con stock crítico que requieren reposición');
   
-  let finalY = 45;
+  let finalY = 75;
   
   // Resumen crítico
   const critical = toOrder.filter(p => p.stock === 0).length;
@@ -404,7 +466,6 @@ export const generateReplenishmentPDF = (products: Product[]) => {
       8: { halign: 'center', fontStyle: 'bold', cellWidth: 20 }
     },
     didParseCell: function(data: any) {
-      // Estado
       if (data.section === 'body' && data.column.index === 8) {
         if (data.cell.raw === 'AGOTADO') {
           data.cell.styles.textColor = [255, 255, 255];
@@ -413,7 +474,6 @@ export const generateReplenishmentPDF = (products: Product[]) => {
           data.cell.styles.textColor = COLORS.warning;
         }
       }
-      // Stock actual
       if (data.section === 'body' && data.column.index === 2) {
         if (data.cell.raw === 'AGOTADO') {
           data.cell.styles.textColor = [255, 255, 255];
@@ -422,12 +482,11 @@ export const generateReplenishmentPDF = (products: Product[]) => {
       }
     },
     didDrawPage: function(data: any) {
-      // Agregar total en la última página
       if (data.pageNumber === doc.internal.pages.length - 1) {
         const pageHeight = doc.internal.pageSize.height;
         const finalTableY = data.cursor.y;
         
-        if (finalTableY < pageHeight - 50) {
+        if (finalTableY < pageHeight - 60) {
           const totalCost = toOrder.reduce((sum, p) => {
             const suggested = Math.max((p.minStock * 2) - p.stock, 0);
             return sum + (suggested * p.price);
@@ -443,7 +502,8 @@ export const generateReplenishmentPDF = (products: Product[]) => {
           doc.text(`${CURRENCY_SYMBOL}${totalCost.toLocaleString()}`, 170, finalTableY + 12);
         }
       }
-    }
+    },
+    margin: { bottom: 30 }
   });
   
   const totalPages = doc.internal.pages.length - 1;
