@@ -32,6 +32,9 @@ import {
   Tooltip, 
   ResponsiveContainer
 } from 'recharts';
+import { Toaster, toast } from 'react-hot-toast';
+import { Html5Qrcode } from 'html5-qrcode';
+import * as XLSX from 'xlsx'; // Importación para leer Excel
 
 // IMPORTANTE: Asegúrate de que esta ruta es correcta en tu proyecto
 import { supabase } from './supabaseClient';
@@ -71,7 +74,7 @@ const getAlertLevel = (product: Product): AlertLevel => {
 
 // --- Components ---
 
-const LoginScreen = ({ onLogin, users }: { onLogin: (u: User) => void, users: User[] }) => {
+const LoginScreen = ({ onLogin, users, darkMode }: { onLogin: (u: User) => void, users: User[], darkMode: boolean }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -81,36 +84,38 @@ const LoginScreen = ({ onLogin, users }: { onLogin: (u: User) => void, users: Us
         const user = users.find(u => u.username === username && u.password === password);
         if (user) {
             onLogin(user);
+            toast.success(`Bienvenido, ${user.name}`);
         } else {
             setError('Credenciales inválidas');
+            toast.error('Usuario o contraseña incorrectos');
         }
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 dark:bg-slate-950 transition-colors duration-300">
+            <div className={`rounded-2xl p-8 w-full max-w-md shadow-2xl transition-colors duration-300 ${darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'}`}>
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mb-4">
+                    <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${darkMode ? 'bg-emerald-900 text-emerald-300' : 'bg-emerald-100 text-emerald-600'}`}>
                         <Package size={32} />
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-900">SIGIR5</h1>
-                    <p className="text-slate-500">Sistema de Inventario de la Región de Policía No. 5</p>
+                    <h1 className="text-2xl font-bold">SIGIR5</h1>
+                    <p className={`text-sm mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sistema de Inventario de la Región de Policía No. 5</p>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Usuario</label>
+                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Usuario</label>
                         <input 
                             type="text" 
-                            className="w-full border rounded-lg p-3 outline-none focus:ring-2 focus:ring-emerald-500"
+                            className={`w-full border rounded-lg p-3 outline-none focus:ring-2 focus:ring-emerald-500 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                             value={username}
                             onChange={e => setUsername(e.target.value)}
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Contraseña</label>
                         <input 
                             type="password" 
-                            className="w-full border rounded-lg p-3 outline-none focus:ring-2 focus:ring-emerald-500"
+                            className={`w-full border rounded-lg p-3 outline-none focus:ring-2 focus:ring-emerald-500 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
                         />
@@ -119,7 +124,7 @@ const LoginScreen = ({ onLogin, users }: { onLogin: (u: User) => void, users: Us
                     <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition">
                         Ingresar
                     </button>
-                    <div className="text-xs text-center text-slate-400 mt-4">
+                    <div className={`text-xs text-center mt-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                         Demo: usuario/clave o visitante/123
                     </div>
                 </form>
@@ -131,11 +136,13 @@ const LoginScreen = ({ onLogin, users }: { onLogin: (u: User) => void, users: Us
 const Dashboard = ({ 
   products, 
   categories,
-  onCategoryClick
+  onCategoryClick,
+  darkMode
 }: { 
   products: Product[], 
   categories: Category[],
-  onCategoryClick: (catId: string) => void
+  onCategoryClick: (catId: string) => void,
+  darkMode: boolean
 }) => {
   const stats = useMemo(() => {
     let lowStock = 0;
@@ -173,25 +180,25 @@ const Dashboard = ({
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-slate-800">Panel de Control</h2>
+      <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>Panel de Control</h2>
       
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-          <div className="text-slate-500 text-sm font-medium">Total Productos</div>
-          <div className="text-2xl font-bold text-slate-900">{stats.totalCount}</div>
+        <div className={`p-4 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <div className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Productos</div>
+          <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{stats.totalCount}</div>
         </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-          <div className="text-slate-500 text-sm font-medium">Valor Inventario</div>
-          <div className="text-2xl font-bold text-slate-900">${stats.totalVal.toLocaleString()}</div>
+        <div className={`p-4 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <div className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Valor Inventario</div>
+          <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>${stats.totalVal.toLocaleString()}</div>
         </div>
-        <div className="bg-red-50 p-4 rounded-xl shadow-sm border border-red-200">
+        <div className={`p-4 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-800 border-red-900' : 'bg-red-50 border-red-200'}`}>
           <div className="text-red-600 text-sm font-medium flex items-center gap-2">
             <AlertOctagon size={16} /> Críticos / Agotados
           </div>
           <div className="text-2xl font-bold text-red-700">{stats.outOfStock + stats.lowStock}</div>
         </div>
-        <div className="bg-amber-50 p-4 rounded-xl shadow-sm border border-amber-200">
+        <div className={`p-4 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-800 border-amber-900' : 'bg-amber-50 border-amber-200'}`}>
           <div className="text-amber-600 text-sm font-medium flex items-center gap-2">
             <Calendar size={16} /> Vencidos / Por Vencer
           </div>
@@ -199,15 +206,16 @@ const Dashboard = ({
         </div>
       </div>
 
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white shadow-lg">
+      <div className={`rounded-xl p-6 text-white shadow-lg transition-colors ${darkMode ? 'bg-blue-900' : 'bg-gradient-to-r from-blue-600 to-blue-700'}`}>
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold mb-1">Reporte Integral</h3>
-            <p className="text-sm text-blue-100">Descarga todos los datos en un solo archivo Excel</p>
+            <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-blue-100'}`}>Descarga todos los datos en un solo archivo Excel</p>
           </div>
           <button 
-            onClick={() => generateCompleteExcel(products, categories, [])} // Pasamos array vacío de transacciones si no se usan aqui o usar un prop
-            className="bg-white text-blue-600 px-6 py-3 rounded-lg flex items-center gap-2 font-bold hover:bg-blue-50 transition-colors shadow-lg">
+            onClick={() => generateCompleteExcel(products, categories, [])}
+            className={`px-6 py-3 rounded-lg flex items-center gap-2 font-bold transition-colors shadow-lg ${darkMode ? 'bg-blue-800 hover:bg-blue-700' : 'bg-white text-blue-600 hover:bg-blue-50'}`}
+          >
             <FileSpreadsheet size={20} /> Descargar Completo
           </button>
         </div>
@@ -215,8 +223,8 @@ const Dashboard = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Chart / Categories Navigation */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
-          <h3 className="text-lg font-semibold mb-4">Stock por Categoría (Click para filtrar)</h3>
+        <div className={`p-6 rounded-xl shadow-sm border lg:col-span-2 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>Stock por Categoría (Click para filtrar)</h3>
           <div className="h-64 cursor-pointer">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart 
@@ -229,10 +237,10 @@ const Dashboard = ({
                     }
                 }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} stroke={darkMode ? "#94a3b8" : "#64748b"} />
+                <YAxis fontSize={12} tickLine={false} axisLine={false} stroke={darkMode ? "#94a3b8" : "#64748b"} />
+                <Tooltip contentStyle={{ backgroundColor: darkMode ? '#1e293b' : '#fff', color: darkMode ? '#fff' : '#000', borderRadius: '8px' }} />
                 <Bar dataKey="stock" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -243,7 +251,7 @@ const Dashboard = ({
                 <button 
                     key={cat.id} 
                     onClick={() => onCategoryClick(cat.id)}
-                    className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded-full border border-slate-300 transition-colors"
+                    className={`text-xs px-3 py-1 rounded-full border transition-colors ${darkMode ? 'bg-slate-700 text-slate-200 border-slate-600 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'}`}
                 >
                     {cat.name}
                 </button>
@@ -252,22 +260,22 @@ const Dashboard = ({
         </div>
 
         {/* Active Alerts List */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col h-full">
-          <h3 className="text-lg font-semibold mb-4">Alertas Activas</h3>
+        <div className={`p-6 rounded-xl shadow-sm border flex flex-col h-full transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>Alertas Activas</h3>
           <div className="overflow-y-auto flex-1 pr-2 space-y-3 max-h-[300px]">
             {alerts.length === 0 ? (
-                <p className="text-slate-400 text-sm">No hay alertas activas.</p>
+                <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>No hay alertas activas.</p>
             ) : (
                 alerts.map((item) => (
                 <div key={item.product.id} className={`p-3 rounded-lg border flex justify-between items-start ${
-                    item.level === AlertLevel.OUT_OF_STOCK ? 'bg-slate-100 border-slate-300' :
-                    item.level === AlertLevel.EXPIRED ? 'bg-red-50 border-red-100' :
-                    item.level === AlertLevel.LOW_STOCK ? 'bg-orange-50 border-orange-100' :
-                    'bg-yellow-50 border-yellow-100'
+                    item.level === AlertLevel.OUT_OF_STOCK ? 'bg-slate-100 border-slate-300 dark:bg-slate-700 dark:border-slate-600' :
+                    item.level === AlertLevel.EXPIRED ? 'bg-red-50 border-red-100 dark:bg-red-900/30 dark:border-red-800' :
+                    item.level === AlertLevel.LOW_STOCK ? 'bg-orange-50 border-orange-100 dark:bg-orange-900/30 dark:border-orange-800' :
+                    'bg-yellow-50 border-yellow-100 dark:bg-yellow-900/30 dark:border-yellow-800'
                 }`}>
                     <div>
-                    <div className="font-medium text-sm text-slate-800">{item.product.name}</div>
-                    <div className="text-xs text-slate-500">{item.product.code}</div>
+                    <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-800'}`}>{item.product.name}</div>
+                    <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{item.product.code}</div>
                     </div>
                     <span className={`text-xs font-bold px-2 py-1 rounded-full ${
                     item.level === AlertLevel.OUT_OF_STOCK ? 'bg-slate-800 text-white' :
@@ -288,7 +296,7 @@ const Dashboard = ({
 };
 
 // --- User Management Component ---
-const UserManagement = ({ users, onAddUser, currentUser }: { users: User[], onAddUser: (u: User) => void, currentUser: User }) => {
+const UserManagement = ({ users, onAddUser, currentUser, darkMode }: { users: User[], onAddUser: (u: User) => void, currentUser: User, darkMode: boolean }) => {
     const [newUser, setNewUser] = useState<Partial<User>>({ role: 'viewer', username: '', password: '', name: '' });
 
     if (currentUser.role !== 'admin') return <div className="p-8 text-center text-slate-500">Acceso denegado.</div>;
@@ -301,34 +309,35 @@ const UserManagement = ({ users, onAddUser, currentUser }: { users: User[], onAd
                 ...newUser
             } as User);
             setNewUser({ role: 'viewer', username: '', password: '', name: '' });
+            toast.success('Usuario creado exitosamente');
         }
     };
 
     return (
         <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-800">Gestión de Usuarios</h2>
+            <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>Gestión de Usuarios</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div className={`md:col-span-1 p-6 rounded-xl shadow-sm border transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                     <h3 className="font-bold mb-4">Nuevo Usuario</h3>
                     <form onSubmit={handleAdd} className="space-y-4">
-                        <input className="w-full border p-2 rounded text-sm" placeholder="Nombre Completo" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} required />
-                        <input className="w-full border p-2 rounded text-sm" placeholder="Usuario" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} required />
-                        <input className="w-full border p-2 rounded text-sm" type="password" placeholder="Contraseña" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} required />
-                        <select className="w-full border p-2 rounded text-sm" value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}>
+                        <input className={`w-full border p-2 rounded text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-white`} placeholder="Nombre Completo" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} required />
+                        <input className={`w-full border p-2 rounded text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-white`} placeholder="Usuario" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} required />
+                        <input className={`w-full border p-2 rounded text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-white`} type="password" placeholder="Contraseña" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} required />
+                        <select className={`w-full border p-2 rounded text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-white`} value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}>
                             <option value="viewer">Vista (Solo lectura)</option>
                             <option value="admin">Administrador</option>
                         </select>
-                        <button className="w-full bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700">Crear Usuario</button>
+                        <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium">Crear Usuario</button>
                     </form>
                 </div>
-                <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className={`md:col-span-2 rounded-xl shadow-sm border overflow-hidden transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50"><tr><th className="p-4">Nombre</th><th className="p-4">Usuario</th><th className="p-4">Rol</th></tr></thead>
+                        <thead className={`${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}><tr><th className="p-4">Nombre</th><th className="p-4">Usuario</th><th className="p-4">Rol</th></tr></thead>
                         <tbody>
                             {users.map(u => (
-                                <tr key={u.id} className="border-t border-slate-100">
+                                <tr key={u.id} className={`border-t ${darkMode ? 'border-slate-700' : 'border-slate-100'}`}>
                                     <td className="p-4">{u.name}</td>
-                                    <td className="p-4 font-mono text-slate-500">{u.username}</td>
+                                    <td className={`p-4 font-mono ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{u.username}</td>
                                     <td className="p-4">
                                         <span className={`px-2 py-1 rounded-full text-xs font-bold ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}>
                                             {u.role === 'admin' ? 'Administrador' : 'Vista'}
@@ -345,7 +354,7 @@ const UserManagement = ({ users, onAddUser, currentUser }: { users: User[], onAd
 };
 
 // --- Product Modal (Add/Edit/View) ---
-const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave, userRole }: any) => {
+const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave, userRole, darkMode }: any) => {
     const [formData, setFormData] = useState<Partial<Product>>({
         categoryId: categories[0]?.id,
         stock: 0,
@@ -391,12 +400,12 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <h3 className="text-xl font-bold text-slate-800">
+            <div className={`rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] transition-colors ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
+                <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                    <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                         {product ? (isEditMode ? 'Editar Producto' : 'Detalles del Producto') : 'Nuevo Producto'}
                     </h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors text-2xl leading-none">&times;</button>
+                    <button onClick={onClose} className={`transition-colors text-2xl leading-none ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-600'}`}>&times;</button>
                 </div>
                 
                 <form onSubmit={(e) => { e.preventDefault(); onSave(formData as Product); }} className="p-6 overflow-y-auto space-y-5">
@@ -404,10 +413,10 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
                     {/* Primary Info */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Categoría</label>
+                            <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Categoría</label>
                             <select 
                                 disabled={readOnly}
-                                className="w-full border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none border bg-white disabled:bg-slate-100"
+                                className={`w-full border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none border bg-white disabled:bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                                 value={formData.categoryId} 
                                 onChange={e => handleCategoryChange(e.target.value)}
                             >
@@ -415,20 +424,20 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Código</label>
-                            <input disabled={readOnly} required type="text" className="w-full border-slate-300 rounded-lg p-2.5 text-sm border disabled:bg-slate-100" 
+                            <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Código</label>
+                            <input disabled={readOnly} required type="text" className={`w-full border-slate-300 rounded-lg p-2.5 text-sm border disabled:bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-white`} 
                                 value={formData.code || ''} onChange={e => handleChange('code', e.target.value)} />
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Nombre del Producto</label>
+                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Nombre del Producto</label>
                         <input 
                             list="product-suggestions"
                             disabled={readOnly} 
                             required 
                             type="text" 
-                            className="w-full border-slate-300 rounded-lg p-2.5 text-sm border focus:ring-2 focus:ring-emerald-500 outline-none disabled:bg-slate-100 font-semibold text-slate-800"
+                            className={`w-full border-slate-300 rounded-lg p-2.5 text-sm border focus:ring-2 focus:ring-emerald-500 outline-none disabled:bg-slate-100 font-semibold dark:bg-slate-700 dark:border-slate-600 dark:text-white ${darkMode ? 'text-white' : 'text-slate-800'}`}
                             value={formData.name || ''} 
                             onChange={e => handleChange('name', e.target.value)} 
                             placeholder="Ej. Resma de Papel"
@@ -439,10 +448,10 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Descripción / Detalles</label>
+                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Descripción / Detalles</label>
                         <textarea 
                             disabled={readOnly}
-                            className="w-full border-slate-300 rounded-lg p-2.5 text-sm border focus:ring-2 focus:ring-emerald-500 outline-none disabled:bg-slate-100"
+                            className={`w-full border-slate-300 rounded-lg p-2.5 text-sm border focus:ring-2 focus:ring-emerald-500 outline-none disabled:bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                             rows={2}
                             placeholder="Ej: Tamaño Oficio, Carta, Color..."
                             value={formData.description || ''}
@@ -451,22 +460,22 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
                     </div>
 
                     {/* Stock Section */}
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><Package size={16}/> Control de Inventario</h4>
+                    <div className={`p-4 rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                        <h4 className={`text-sm font-bold mb-3 flex items-center gap-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}><Package size={16}/> Control de Inventario</h4>
                         <div className="grid grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-1">Cant. Inicial</label>
-                                <input disabled={readOnly} type="number" min="0" className="w-full border rounded p-2 text-sm text-center font-medium" 
+                                <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Cant. Inicial</label>
+                                <input disabled={readOnly} type="number" min="0" className={`w-full border rounded p-2 text-sm text-center font-medium dark:bg-slate-700 dark:border-slate-600 dark:text-white`} 
                                     value={formData.initialStock} onChange={e => handleChange('initialStock', parseInt(e.target.value) || 0)} />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-1">Cant. Actual</label>
-                                <input disabled={readOnly} type="number" min="0" className="w-full border rounded p-2 text-sm text-center font-bold text-emerald-700 bg-white" 
+                                <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Cant. Actual</label>
+                                <input disabled={readOnly} type="number" min="0" className={`w-full border rounded p-2 text-sm text-center font-bold text-emerald-700 bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-emerald-400`} 
                                     value={formData.stock} onChange={e => handleChange('stock', parseInt(e.target.value) || 0)} />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-1">Diferencia</label>
-                                <div className="w-full p-2 text-sm text-center font-bold text-slate-700 border rounded bg-slate-100">
+                                <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Diferencia</label>
+                                <div className={`w-full p-2 text-sm text-center font-bold border rounded ${darkMode ? 'bg-slate-800 border-slate-600 text-slate-300' : 'bg-slate-100'}`}>
                                     {(formData.initialStock || 0) - (formData.stock || 0)}
                                 </div>
                             </div>
@@ -475,25 +484,25 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
 
                     <div className="grid grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Unidad</label>
-                            <input disabled={readOnly} required type="text" className="w-full border rounded p-2.5 text-sm" 
+                            <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Unidad</label>
+                            <input disabled={readOnly} required type="text" className={`w-full border rounded p-2.5 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white`} 
                                 value={formData.unit || ''} onChange={e => handleChange('unit', e.target.value)} />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Min Stock</label>
-                            <input disabled={readOnly} type="number" className="w-full border rounded p-2.5 text-sm" 
+                            <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Min Stock</label>
+                            <input disabled={readOnly} type="number" className={`w-full border rounded p-2.5 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white`} 
                                 value={formData.minStock || 0} onChange={e => handleChange('minStock', parseInt(e.target.value))} />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Precio Unit.</label>
-                            <input disabled={readOnly} type="number" step="0.01" className="w-full border rounded p-2.5 text-sm" 
+                            <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Precio Unit.</label>
+                            <input disabled={readOnly} type="number" step="0.01" className={`w-full border rounded p-2.5 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white`} 
                                 value={formData.price || 0} onChange={e => handleChange('price', parseFloat(e.target.value))} />
                         </div>
                     </div>
 
                     <div>
-                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Vencimiento</label>
-                         <input disabled={readOnly} type="date" className="w-full border rounded p-2.5 text-sm" 
+                         <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Vencimiento</label>
+                         <input disabled={readOnly} type="date" className={`w-full border rounded p-2.5 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white`} 
                             value={formData.expirationDate || ''} onChange={e => handleChange('expirationDate', e.target.value)} />
                     </div>
 
@@ -510,6 +519,95 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
     );
 };
 
+// --- Scanner Component ---
+const ScannerModal = ({ isOpen, onClose, onScan, darkMode }: { isOpen: boolean, onClose: () => void, onScan: (decodedText: string) => void, darkMode: boolean }) => {
+  
+  useEffect(() => {
+    let html5QrCode: Html5Qrcode | null = null;
+
+    const startScanner = async () => {
+      try {
+        html5QrCode = new Html5Qrcode("reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        
+        await html5QrCode.start(
+          { facingMode: "environment" }, 
+          config, 
+          (decodedText, decodedResult) => {
+            onScan(decodedText);
+            toast.success('Código detectado', { icon: '📷' });
+            
+            if(html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    onClose(); 
+                }).catch(err => console.error("Error al detener", err));
+            }
+          },
+          (errorMessage) => {
+            // Ignorar errores de escaneo continuo
+          }
+        );
+      } catch (err) {
+        console.error("Error iniciando escáner", err);
+        toast.error("No se pudo acceder a la cámara. Verifica permisos.");
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      startScanner();
+    } else {
+      if (html5QrCode) {
+        html5QrCode.stop().catch(err => console.log(err));
+      }
+    }
+
+    return () => {
+      if (html5QrCode) {
+        html5QrCode.stop().catch(err => console.log(err));
+      }
+    };
+  }, [isOpen, onScan, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+      <div className={`rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col transition-colors ${darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'}`}>
+        <div className={`p-4 border-b flex justify-between items-center ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+            <h3 className={`text-lg font-bold flex items-center gap-2`}>
+                <div className="w-2 h-6 bg-emerald-500 rounded-full animate-pulse"></div>
+                Escáner de Productos
+            </h3>
+            <button onClick={onClose} className={`p-2 rounded-lg transition ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-200'}`}>
+                ✕
+            </button>
+        </div>
+
+        <div className="p-6 bg-black relative flex items-center justify-center min-h-[300px]">
+            <div id="reader" className="w-full max-w-[300px]"></div>
+            <div className="absolute pointer-events-none border-4 border-emerald-500/50 w-64 h-64 rounded-lg border-dashed animate-spin-slow"></div>
+        </div>
+
+        <div className={`p-6 text-center ${darkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
+            <p className={`text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                Apunta el código de barras o QR a la cámara
+            </p>
+            <p className="text-xs opacity-60">
+                Asegúrate de tener buena iluminación
+            </p>
+            <button 
+                onClick={onClose}
+                className={`mt-4 px-6 py-2 rounded-lg font-bold transition ${darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-200 hover:bg-slate-300'}`}
+            >
+                Cancelar
+            </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Inventory Component ---
 
 const InventoryList = ({ 
@@ -518,16 +616,20 @@ const InventoryList = ({
   onAddProduct,
   onEditProduct,
   onDeleteProduct,
+  onImport, // Nuevo prop
   initialCategoryFilter,
-  currentUser
+  currentUser,
+  darkMode
 }: { 
   products: Product[], 
   categories: Category[],
   onAddProduct: (p: Product) => void,
   onEditProduct: (p: Product) => void,
   onDeleteProduct: (id: string) => void,
+  onImport: (e: React.ChangeEvent<HTMLInputElement>) => void, // Nuevo prop
   initialCategoryFilter: string | null,
-  currentUser: User
+  currentUser: User,
+  darkMode: boolean
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -536,6 +638,7 @@ const InventoryList = ({
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isScannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
     if (initialCategoryFilter) setCategoryFilter(initialCategoryFilter);
@@ -557,7 +660,7 @@ const InventoryList = ({
 
   const handleRowClick = (product: Product) => {
     setSelectedProduct(product);
-    setIsEditMode(false); // Default to view mode
+    setIsEditMode(false); 
     setModalOpen(true);
   };
 
@@ -565,7 +668,6 @@ const InventoryList = ({
     if (selectedProduct && selectedProduct.id) {
         onEditProduct(productData);
     } else {
-        // Create new
         const newId = `prod_${Date.now()}`;
         onAddProduct({ ...productData, id: newId });
     }
@@ -576,10 +678,15 @@ const InventoryList = ({
       setIsEditMode(true);
   };
 
+  const handleScanSuccess = (decodedCode: string) => {
+    setSearchTerm(decodedCode);
+    toast.success(`Buscando código: ${decodedCode}`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-2xl font-bold text-slate-800">Inventario General</h2>
+        <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>Inventario General</h2>
         <div className="flex gap-2 w-full md:w-auto flex-wrap">
             {/* Botón PDF */}
             <button 
@@ -595,6 +702,33 @@ const InventoryList = ({
                 <FileSpreadsheet size={18} /> Excel
             </button>
 
+            {/* Botón Importar */}
+            <div className="relative">
+                <input 
+                    type="file" 
+                    accept=".xlsx, .xls, .csv" 
+                    onChange={(e) => {
+                        onImport(e);
+                        e.target.value = ''; 
+                    }}
+                    className="hidden" 
+                    id="importInput"
+                />
+                <label 
+                    htmlFor="importInput"
+                    className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm font-bold shadow-md cursor-pointer border border-amber-400"
+                >
+                    📥 Importar Excel
+                </label>
+            </div>
+
+            {/* Botón Escáner */}
+            <button 
+                onClick={() => setScannerOpen(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm font-medium shadow-md">
+                📷 Escanear
+            </button>
+
             {currentUser.role === 'admin' && (
                 <button 
                     onClick={handleOpenCreate}
@@ -605,21 +739,21 @@ const InventoryList = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+      <div className={`rounded-xl shadow-sm border overflow-hidden flex flex-col transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
         {/* Filters */}
-        <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col md:flex-row items-center gap-3">
+        <div className={`p-4 border-b flex flex-col md:flex-row items-center gap-3 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
           <div className="relative flex-1 w-full">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-400'}`} />
             <input 
                 type="text" 
                 placeholder="Buscar por nombre, código o descripción..." 
-                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className={`w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <select 
-            className="w-full md:w-64 py-2 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className={`w-full md:w-64 py-2 px-3 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
           >
@@ -631,7 +765,7 @@ const InventoryList = ({
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-xs">
+            <thead className={`${darkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-50 text-slate-500'} font-semibold uppercase tracking-wider text-xs`}>
               <tr>
                 <th className="px-6 py-4">Producto</th>
                 <th className="px-6 py-4">Categoría</th>
@@ -642,23 +776,23 @@ const InventoryList = ({
                 <th className="px-6 py-4 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
               {filteredProducts.map(product => {
                 const category = categories.find(c => c.id === product.categoryId);
                 const alert = getAlertLevel(product);
                 const difference = (product.initialStock || 0) - product.stock;
                 
                 return (
-                  <tr key={product.id} className="hover:bg-slate-50 cursor-pointer group" onClick={() => handleRowClick(product)}>
+                  <tr key={product.id} className={`hover:${darkMode ? 'bg-slate-700' : 'bg-slate-50'} cursor-pointer group`} onClick={() => handleRowClick(product)}>
                     <td className="px-6 py-4">
-                        <div className="font-medium text-slate-900">{product.name}</div>
-                        <div className="text-xs text-slate-500">{product.description}</div>
-                        <div className="text-xs font-mono text-slate-400 mt-1">{product.code}</div>
+                        <div className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{product.name}</div>
+                        <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{product.description}</div>
+                        <div className={`text-xs font-mono mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{product.code}</div>
                     </td>
-                    <td className="px-6 py-4 text-slate-600">
-                        <span className="inline-block bg-slate-100 px-2 py-1 rounded text-xs">{category?.name}</span>
+                    <td className={`px-6 py-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                        <span className={`inline-block px-2 py-1 rounded text-xs ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>{category?.name}</span>
                     </td>
-                    <td className="px-6 py-4 text-center text-slate-500">{product.initialStock}</td>
+                    <td className={`px-6 py-4 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{product.initialStock}</td>
                     <td className="px-6 py-4 text-center">
                         <span className={`px-2 py-1 rounded font-bold ${
                             product.stock === 0 ? 'text-slate-200 bg-slate-800' : 
@@ -667,8 +801,8 @@ const InventoryList = ({
                             {product.stock}
                         </span>
                     </td>
-                    <td className="px-6 py-4 text-center">
-                        <span className="text-xs font-mono text-slate-500">{difference > 0 ? `-${difference}` : difference}</span>
+                    <td className={`px-6 py-4 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span className="text-xs font-mono">{difference > 0 ? `-${difference}` : difference}</span>
                     </td>
                     <td className="px-6 py-4 text-center">
                         {alert !== AlertLevel.NONE ? (
@@ -684,11 +818,11 @@ const InventoryList = ({
                     </td>
                     <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => handleRowClick(product)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition">
+                            <button onClick={() => handleRowClick(product)} className={`p-2 rounded-full transition ${darkMode ? 'text-slate-400 hover:text-blue-400 hover:bg-slate-700' : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'}`}>
                                 <Eye size={16} />
                             </button>
                             {currentUser.role === 'admin' && (
-                                <button onClick={(e) => { e.stopPropagation(); onDeleteProduct(product.id); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition">
+                                <button onClick={(e) => { e.stopPropagation(); onDeleteProduct(product.id); }} className={`p-2 rounded-full transition ${darkMode ? 'text-slate-400 hover:text-red-400 hover:bg-slate-700' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}>
                                     <Trash2 size={16} />
                                 </button>
                             )}
@@ -710,8 +844,16 @@ const InventoryList = ({
         isEditMode={isEditMode}
         onSave={handleSaveFromModal}
         userRole={currentUser.role}
+        darkMode={darkMode}
       />
       
+      <ScannerModal 
+        isOpen={isScannerOpen} 
+        onClose={() => setScannerOpen(false)} 
+        onScan={handleScanSuccess}
+        darkMode={darkMode}
+      />
+
       {modalOpen && !isEditMode && currentUser.role === 'admin' && (
           <div className="fixed z-[60] bottom-10 right-10">
               <button onClick={switchToEdit} className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg flex items-center gap-2">
@@ -728,11 +870,13 @@ const InventoryList = ({
 const WriteOffModule = ({
     products,
     transactions,
-    onProcessBaja
+    onProcessBaja,
+    darkMode
 }: {
     products: Product[],
     transactions: Transaction[],
-    onProcessBaja: (productId: string, qty: number, reason: string, dest?: string, receiver?: string) => void
+    onProcessBaja: (productId: string, qty: number, reason: string, dest?: string, receiver?: string) => void,
+    darkMode: boolean
 }) => {
     const [selectedId, setSelectedId] = useState('');
     const [quantity, setQuantity] = useState(1);
@@ -751,25 +895,22 @@ const WriteOffModule = ({
             setNotes('');
             setDestination('');
             setReceiver('');
-            alert('Salida procesada correctamente');
-        } else {
-            alert('Error: Verifique el stock disponible');
-        }
+        } 
     };
 
     return (
         <div className="space-y-8">
             <div className="max-w-3xl mx-auto space-y-6">
-                <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <h2 className={`text-2xl font-bold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                     <ArrowDownCircle className="text-red-500" />
                     Registrar Salida / Baja
                 </h2>
-                <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+                <div className={`p-8 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Seleccionar Producto</label>
+                            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Seleccionar Producto</label>
                             <select 
-                                className="w-full border-slate-200 rounded-lg p-3 text-slate-700 border focus:ring-2 focus:ring-red-100 outline-none bg-white"
+                                className={`w-full border-slate-200 rounded-lg p-3 text-slate-700 border focus:ring-2 focus:ring-red-100 outline-none bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                                 value={selectedId}
                                 onChange={(e) => setSelectedId(e.target.value)}
                                 required
@@ -782,30 +923,30 @@ const WriteOffModule = ({
                         </div>
 
                         {selectedProduct && (
-                            <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 grid grid-cols-2 gap-4 text-sm">
-                                <div><span className="text-slate-500">Stock Actual:</span> <span className="font-bold text-slate-800">{selectedProduct.stock} {selectedProduct.unit}</span></div>
-                                <div><span className="text-slate-500">Ubicación:</span> <span className="font-bold text-slate-800">{selectedProduct.location || 'N/A'}</span></div>
+                            <div className={`p-4 rounded-lg border grid grid-cols-2 gap-4 text-sm ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                                <div><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Stock Actual:</span> <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{selectedProduct.stock} {selectedProduct.unit}</span></div>
+                                <div><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Ubicación:</span> <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{selectedProduct.location || 'N/A'}</span></div>
                             </div>
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Cantidad a Retirar</label>
+                                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Cantidad a Retirar</label>
                                 <input 
                                     type="number" 
                                     min="1" 
                                     max={selectedProduct?.stock || 1} 
                                     value={quantity}
                                     onChange={(e) => setQuantity(Number(e.target.value))}
-                                    className="w-full border-slate-200 rounded-lg p-3 border outline-none focus:ring-2 focus:ring-red-100 transition-all"
+                                    className={`w-full border-slate-200 rounded-lg p-3 border outline-none focus:ring-2 focus:ring-red-100 transition-all dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Motivo de Salida</label>
+                                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Motivo de Salida</label>
                                 <select 
                                     value={reason}
                                     onChange={(e) => setReason(e.target.value)}
-                                    className="w-full border-slate-200 rounded-lg p-3 border outline-none focus:ring-2 focus:ring-red-100 bg-white"
+                                    className={`w-full border-slate-200 rounded-lg p-3 border outline-none focus:ring-2 focus:ring-red-100 bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                                 >
                                     <option value="Consumo">Consumo Interno / Entrega</option>
                                     <option value="Solicitud">Solicitud de Área</option>
@@ -817,31 +958,31 @@ const WriteOffModule = ({
                             </div>
                         </div>
 
-                        <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg space-y-4">
-                            <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                        <div className={`p-4 border rounded-lg space-y-4 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                            <h4 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                 <Building2 size={16}/> Datos de Entrega
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Oficina / Departamento Destino</label>
+                                    <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Oficina / Departamento Destino</label>
                                     <input 
                                         type="text" 
                                         placeholder="Ej: Contabilidad, RRHH..."
                                         value={destination}
                                         onChange={(e) => setDestination(e.target.value)}
-                                        className="w-full border-slate-200 rounded-lg p-2.5 border outline-none focus:ring-2 focus:ring-blue-100 text-sm"
+                                        className={`w-full border-slate-200 rounded-lg p-2.5 border outline-none focus:ring-2 focus:ring-blue-100 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Recibido por (Nombre)</label>
+                                    <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Recibido por (Nombre)</label>
                                     <div className="relative">
-                                        <UserCheck size={16} className="absolute left-3 top-3 text-slate-400"/>
+                                        <UserCheck size={16} className={`absolute left-3 top-3 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}/>
                                         <input 
                                             type="text" 
                                             placeholder="Nombre del responsable"
                                             value={receiver}
                                             onChange={(e) => setReceiver(e.target.value)}
-                                            className="w-full border-slate-200 rounded-lg pl-9 pr-3 py-2.5 border outline-none focus:ring-2 focus:ring-blue-100 text-sm"
+                                            className={`w-full border-slate-200 rounded-lg pl-9 pr-3 py-2.5 border outline-none focus:ring-2 focus:ring-blue-100 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                                         />
                                     </div>
                                 </div>
@@ -849,12 +990,12 @@ const WriteOffModule = ({
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Notas Adicionales</label>
+                            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Notas Adicionales</label>
                             <textarea 
                                 rows={2} 
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
-                                className="w-full border-slate-200 rounded-lg p-3 border outline-none focus:ring-2 focus:ring-red-100"
+                                className={`w-full border-slate-200 rounded-lg p-3 border outline-none focus:ring-2 focus:ring-red-100 dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                                 placeholder="Detalle opcional sobre la operación..."
                             ></textarea>
                         </div>
@@ -873,7 +1014,7 @@ const WriteOffModule = ({
             {/* History Section */}
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <h2 className={`text-2xl font-bold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                         <ClipboardList className="text-slate-500" />
                         Historial de Salidas
                     </h2>
@@ -891,33 +1032,33 @@ const WriteOffModule = ({
                     </div>
                 </div>
                 
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className={`rounded-xl shadow-sm border overflow-hidden ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                     <div className="overflow-x-auto max-h-[500px]">
                         <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 sticky top-0">
+                            <thead className={`sticky top-0 ${darkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-50'}`}>
                                 <tr>
-                                    <th className="px-6 py-4 font-semibold text-slate-600">Fecha</th>
-                                    <th className="px-6 py-4 font-semibold text-slate-600">Producto</th>
-                                    <th className="px-6 py-4 font-semibold text-slate-600">Cant.</th>
-                                    <th className="px-6 py-4 font-semibold text-slate-600">Motivo</th>
-                                    <th className="px-6 py-4 font-semibold text-slate-600">Destino</th>
-                                    <th className="px-6 py-4 font-semibold text-slate-600">Recibido Por</th>
+                                    <th className={`px-6 py-4 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Fecha</th>
+                                    <th className={`px-6 py-4 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Producto</th>
+                                    <th className={`px-6 py-4 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Cant.</th>
+                                    <th className={`px-6 py-4 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Motivo</th>
+                                    <th className={`px-6 py-4 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Destino</th>
+                                    <th className={`px-6 py-4 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Recibido Por</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
                                 {transactions.length === 0 ? (
-                                    <tr><td colSpan={6} className="p-8 text-center text-slate-400">No hay movimientos registrados.</td></tr>
+                                    <tr><td colSpan={6} className={`p-8 text-center ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>No hay movimientos registrados.</td></tr>
                                 ) : (
                                     transactions.map(tx => (
-                                        <tr key={tx.id} className="hover:bg-slate-50">
-                                            <td className="px-6 py-4 text-slate-500">
+                                        <tr key={tx.id} className={`hover:${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
+                                            <td className={`px-6 py-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                                 {new Date(tx.date).toLocaleDateString()} <span className="text-xs">{new Date(tx.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                             </td>
-                                            <td className="px-6 py-4 font-medium text-slate-800">{tx.productName}</td>
+                                            <td className={`px-6 py-4 font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>{tx.productName}</td>
                                             <td className="px-6 py-4 font-bold text-red-600">-{tx.quantity}</td>
-                                            <td className="px-6 py-4 text-slate-600">{tx.reason}</td>
-                                            <td className="px-6 py-4 text-slate-600">{tx.destination || '-'}</td>
-                                            <td className="px-6 py-4 text-slate-600">{tx.receiver || '-'}</td>
+                                            <td className={`px-6 py-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{tx.reason}</td>
+                                            <td className={`px-6 py-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{tx.destination || '-'}</td>
+                                            <td className={`px-6 py-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{tx.receiver || '-'}</td>
                                         </tr>
                                     ))
                                 )}
@@ -931,14 +1072,14 @@ const WriteOffModule = ({
 };
 
 // --- New Module: Replenishment ---
-const ReplenishmentModule = ({ products }: { products: Product[] }) => {
+const ReplenishmentModule = ({ products, darkMode }: { products: Product[], darkMode: boolean }) => {
     // Filter products that are low stock or out of stock
     const neededProducts = products.filter(p => p.stock <= p.minStock);
 
     return (
         <div className="space-y-6">
              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <h2 className={`text-2xl font-bold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                     <ShoppingCart className="text-blue-600" />
                     Pedidos y Reabastecimiento
                 </h2>
@@ -958,13 +1099,13 @@ const ReplenishmentModule = ({ products }: { products: Product[] }) => {
                 </div>
              </div>
 
-             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 bg-blue-50 border-b border-blue-100 text-blue-800 text-sm">
+             <div className={`rounded-xl shadow-sm border overflow-hidden ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                <div className={`p-4 text-sm ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-blue-50 border-blue-100 text-blue-800'}`}>
                     Mostrando productos con stock igual o inferior al mínimo permitido. Se sugiere reponer inventario.
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50">
+                        <thead className={darkMode ? 'bg-slate-700' : 'bg-slate-50'}>
                             <tr>
                                 <th className="px-6 py-4">Producto</th>
                                 <th className="px-6 py-4 text-center">Stock Actual</th>
@@ -973,24 +1114,24 @@ const ReplenishmentModule = ({ products }: { products: Product[] }) => {
                                 <th className="px-6 py-4 text-center">Sugerido (Compra)</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
                             {neededProducts.length === 0 ? (
-                                <tr><td colSpan={5} className="p-8 text-center text-slate-400">Todo el inventario está en niveles óptimos.</td></tr>
+                                <tr><td colSpan={5} className={`p-8 text-center ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Todo el inventario está en niveles óptimos.</td></tr>
                             ) : (
                                 neededProducts.map(p => {
                                     const suggested = (p.minStock * 2) - p.stock;
                                     return (
-                                        <tr key={p.id} className="hover:bg-slate-50">
+                                        <tr key={p.id} className={`hover:${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
                                             <td className="px-6 py-4">
-                                                <div className="font-medium text-slate-900">{p.name}</div>
-                                                <div className="text-xs text-slate-500">{p.code}</div>
+                                                <div className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.name}</div>
+                                                <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{p.code}</div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <span className={`font-bold ${p.stock === 0 ? 'text-slate-800' : 'text-red-600'}`}>
                                                     {p.stock}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-center text-slate-500">{p.minStock}</td>
+                                            <td className={`px-6 py-4 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{p.minStock}</td>
                                             <td className="px-6 py-4 text-center">
                                                 {p.stock === 0 ? (
                                                     <span className="bg-slate-800 text-white text-xs px-2 py-1 rounded-full font-bold">AGOTADO</span>
@@ -1018,10 +1159,12 @@ const ReplenishmentModule = ({ products }: { products: Product[] }) => {
 // CategoryManager
 const CategoryManager = ({
     categories,
-    onAddCategory
+    onAddCategory,
+    darkMode
 }: {
     categories: Category[],
-    onAddCategory: (name: string, desc: string) => void
+    onAddCategory: (name: string, desc: string) => void,
+    darkMode: boolean
 }) => {
     const [name, setName] = useState('');
     const [desc, setDesc] = useState('');
@@ -1032,41 +1175,42 @@ const CategoryManager = ({
             onAddCategory(name, desc);
             setName('');
             setDesc('');
+            toast.success('Categoría creada');
         }
     };
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <h3 className="text-lg font-bold mb-4">Nueva Categoría</h3>
+                <div className={`p-6 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                    <h3 className="font-bold mb-4">Nueva Categoría</h3>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="block text-xs font-medium text-slate-500 mb-1">Nombre</label>
-                            <input required value={name} onChange={(e) => setName(e.target.value)} className="w-full border rounded p-2 text-sm" />
+                            <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Nombre</label>
+                            <input required value={name} onChange={(e) => setName(e.target.value)} className={`w-full border p-2 rounded text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white`} />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-slate-500 mb-1">Descripción</label>
-                            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} className="w-full border rounded p-2 text-sm" rows={3} />
+                            <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Descripción</label>
+                            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} className={`w-full border p-2 rounded text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white`} rows={3} />
                         </div>
-                        <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium">Crear Categoría</button>
+                        <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium">Crear Categoría</button>
                     </form>
                 </div>
             </div>
             <div className="lg:col-span-2">
-                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                 <div className={`rounded-xl shadow-sm border overflow-hidden ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50">
+                        <thead className={darkMode ? 'bg-slate-700' : 'bg-slate-50'}>
                             <tr>
                                 <th className="px-6 py-4 font-medium text-slate-500">Nombre</th>
                                 <th className="px-6 py-4 font-medium text-slate-500">Descripción</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
                             {categories.map(cat => (
                                 <tr key={cat.id}>
                                     <td className="px-6 py-4 font-medium">{cat.name}</td>
-                                    <td className="px-6 py-4 text-slate-500">{cat.description}</td>
+                                    <td className={`px-6 py-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{cat.description}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -1092,6 +1236,33 @@ export default function App() {
   // UI State
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+
+  // --- Dark Mode Effect ---
+  useEffect(() => {
+    if (darkMode) {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
+
+  // --- Audit Log Helper ---
+  const logAudit = async (action: string, details: any, currentUser: User | null) => {
+    if (!currentUser) return;
+    try {
+      await supabase.from('audit_logs').insert({
+        user_id: currentUser.id,
+        username: currentUser.name,
+        action: action,
+        target_table: 'products', 
+        target_id: details.id,
+        details: details
+      });
+    } catch (error) {
+      console.error('Error guardando auditoría:', error);
+    }
+  };
 
   // --- Supabase Data Loading ---
   const loadData = async () => {
@@ -1099,7 +1270,6 @@ export default function App() {
     setLoading(true);
     
     try {
-      // Parallel loading including Users
       const [productsRes, categoriesRes, usersRes, txRes] = await Promise.all([
         supabase.from('products').select('*'),
         supabase.from('categories').select('*'),
@@ -1109,39 +1279,99 @@ export default function App() {
       
       if (productsRes.error) {
         console.error('Error productos:', productsRes.error);
+        toast.error('Error cargando productos');
       } else {
-        console.log('✅ Productos:', productsRes.data?.length);
         setProducts(productsRes.data || []);
       }
 
       if (categoriesRes.error) {
         console.error('Error categorías:', categoriesRes.error);
+        toast.error('Error cargando categorías');
       } else {
-        console.log('✅ Categorías:', categoriesRes.data?.length);
         setCategories(categoriesRes.data || []);
       }
 
-      // Handling Users
       if (usersRes.error) {
         console.error('❌ Error cargando usuarios:', usersRes.error);
-        setUsers(INITIAL_USERS); // Fallback
+        setUsers(INITIAL_USERS); 
       } else {
-        console.log('✅ Usuarios cargados:', usersRes.data?.length || 0);
         setUsers(usersRes.data || []);
       }
 
       if (txRes.error) {
         console.error('Error transacciones:', txRes.error);
-        // If table doesn't exist yet, fail silently or fallback to local
       } else {
-        console.log('✅ Transacciones:', txRes.data?.length);
         setTransactions(txRes.data || []);
       }
+
+      toast.success('Datos cargados correctamente');
       
     } catch (err) {
       console.error('Error general cargando datos:', err);
+      toast.error('Error de conexión con la base de datos');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // --- Import Handler ---
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    toast.loading('Procesando archivo...', { id: 'import-toast' });
+
+    try {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0]; 
+        const sheet = workbook.Sheets[sheetName];
+        
+        const jsonData = XLSX.utils.sheet_to_json(sheet);
+        
+        if (!Array.isArray(jsonData) || jsonData.length === 0) {
+            throw new Error("El archivo está vacío o no tiene formato válido");
+        }
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const row of jsonData as any) {
+            if (row.code && row.name && row.categoryId) {
+                const newProd: Product = {
+                    id: `prod_import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    code: row.code,
+                    name: row.name,
+                    description: row.description || '',
+                    categoryId: row.categoryId, 
+                    stock: parseInt(row.stock) || 0,
+                    initialStock: parseInt(row.stock) || 0,
+                    minStock: parseInt(row.minStock) || 5,
+                    unit: row.unit || 'Unidad',
+                    price: parseFloat(row.price) || 0,
+                    status: ProductStatus.ACTIVE,
+                    expirationDate: row.expirationDate || undefined
+                };
+
+                const { error } = await supabase.from('products').insert(newProd);
+                if (!error) {
+                    successCount++;
+                    logAudit('IMPORTED', { id: newProd.id, name: newProd.name }, user);
+                } else {
+                    errorCount++;
+                    console.error('Error importando:', row, error);
+                }
+            }
+        }
+
+        await loadData();
+        toast.dismiss('import-toast');
+        toast.success(`Importación finalizada: ${successCount} productos cargados. ${errorCount} errores.`);
+
+    } catch (error) {
+        console.error(error);
+        toast.dismiss('import-toast');
+        toast.error('Error al leer el archivo. Verifica el formato.');
     }
   };
 
@@ -1150,7 +1380,6 @@ export default function App() {
     setSyncing(true);
     
     try {
-      // Upsert Categories
       for (const cat of INITIAL_CATEGORIES) {
         const { error } = await supabase
           .from('categories')
@@ -1158,7 +1387,6 @@ export default function App() {
         if (error) console.error('Error sync cat:', error);
       }
 
-      // Upsert Products
       for (const prod of INITIAL_PRODUCTS) {
         const { error } = await supabase
           .from('products')
@@ -1166,12 +1394,12 @@ export default function App() {
         if (error) console.error('Error sync prod:', error);
       }
 
-      alert('Sincronización completada. Recargando datos...');
+      toast.success('Sincronización completada con éxito', { icon: '🔄' });
       await loadData();
       
     } catch (err) {
       console.error('Error en sincronización:', err);
-      alert('Hubo un error durante la sincronización.');
+      toast.error('Hubo un error durante la sincronización');
     } finally {
       setSyncing(false);
     }
@@ -1181,53 +1409,75 @@ export default function App() {
     loadData();
   }, []);
 
-  // --- Handlers (Local State + Supabase) ---
+  // --- Handlers (Local State + Supabase + Audit) ---
 
   const handleLogin = (u: User) => setUser(u);
-  const handleLogout = () => setUser(null);
+  const handleLogout = () => {
+      setUser(null);
+      toast('Sesión cerrada');
+  };
 
   const addProduct = async (product: Product) => {
-    // Optimistic update
     setProducts(prev => [...prev, product]);
-    // DB Update
     const { error } = await supabase.from('products').insert(product);
+    
     if (error) {
-      console.error('Error creando producto:', error);
-      alert('Error al guardar en base de datos');
+      toast.error('Error al guardar en base de datos');
+    } else {
+        toast.success('Producto agregado');
+        logAudit('CREATED', { id: product.id, name: product.name, code: product.code }, user);
     }
   };
 
   const editProduct = async (updatedProduct: Product) => {
+    const oldProduct = products.find(p => p.id === updatedProduct.id); 
+    
     setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-    const { error } = await supabase
-      .from('products')
-      .update(updatedProduct)
-      .eq('id', updatedProduct.id);
-    if (error) console.error('Error editando:', error);
+    const { error } = await supabase.from('products').update(updatedProduct).eq('id', updatedProduct.id);
+    
+    if (error) {
+        toast.error('Error al actualizar producto');
+    } else {
+        toast.success('Producto actualizado');
+        logAudit('UPDATED', { 
+            id: updatedProduct.id, 
+            name: updatedProduct.name,
+            old_price: oldProduct?.price,
+            new_price: updatedProduct.price,
+            old_stock: oldProduct?.stock,
+            new_stock: updatedProduct.stock 
+        }, user);
+    }
   };
 
   const deleteProduct = async (id: string) => {
+    const productToDelete = products.find(p => p.id === id); 
     if (!confirm('¿Está seguro de eliminar este producto?')) return;
     
     setProducts(prev => prev.filter(p => p.id !== id));
     const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) console.error('Error eliminando:', error);
+    
+    if (error) {
+        toast.error('Error al eliminar producto');
+    } else {
+        toast.success('Producto eliminado');
+        logAudit('DELETED', { id: id, name: productToDelete?.name, code: productToDelete?.code }, user);
+    }
   };
 
   const processBaja = async (productId: string, qty: number, reason: string, destination?: string, receiver?: string) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
-    // 1. Update Product Stock
+    if (qty > product.stock) {
+        toast.error(`Stock insuficiente. Disponible: ${product.stock}`, { icon: '📉' });
+        return;
+    }
+
     const newStock = product.stock - qty;
     setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: newStock } : p));
-    
-    await supabase
-      .from('products')
-      .update({ stock: newStock })
-      .eq('id', productId);
+    await supabase.from('products').update({ stock: newStock }).eq('id', productId);
 
-    // 2. Record Transaction
     const newTx: Transaction = {
         id: `tx_${Date.now()}`,
         productId,
@@ -1242,55 +1492,95 @@ export default function App() {
     };
     
     setTransactions(prev => [newTx, ...prev]);
-    
-    // Try to save transaction, but don't block if table doesn't exist yet in user's DB
     const { error: txError } = await supabase.from('transactions').insert(newTx);
-    if (txError) console.warn('Transacción no guardada (quizás la tabla no existe):', txError);
+    if (txError) console.warn('Transacción no guardada:', txError);
+    
+    toast.success(`Salida registrada: -${qty} ${product.unit}`, {
+        icon: '📦',
+        style: {
+            border: '1px solid #10b981',
+            padding: '16px',
+            color: '#064e3b',
+        },
+    });
+
+    logAudit('STOCK_OUT', { 
+        id: product.id, 
+        name: product.name, 
+        quantity: qty, 
+        new_stock: newStock,
+        reason: reason 
+    }, user);
   };
 
   const addCategory = async (name: string, description: string) => {
     const newCat: Category = { id: `cat_${Date.now()}`, name, description };
     setCategories(prev => [...prev, newCat]);
     const { error } = await supabase.from('categories').insert(newCat);
-    if (error) console.error('Error creando categoría:', error);
+    if (error) {
+        console.error('Error creando categoría:', error);
+        toast.error('Error al crear categoría');
+    }
   };
 
   const addUser = (newUser: User) => {
       setUsers(prev => [...prev, newUser]);
-      // Users are local-only for this demo usually, unless a Supabase Auth table is set up
+      toast.success('Usuario añadido localmente');
       console.log('Usuario añadido localmente:', newUser);
   };
 
   const navigateToCategory = (catId: string) => {
       setActiveTab('inventory');
-      // We can pass a filter state if we wanted, but for now just switching tab
-      // To implement filtering, we could add a 'inventoryFilter' state like the original
   };
 
   if (!user) {
-      return <LoginScreen onLogin={handleLogin} users={users} />;
+      return <LoginScreen onLogin={handleLogin} users={users} darkMode={darkMode} />;
   }
 
   if (loading) {
       return (
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-            <div className="text-white text-center">
-                <RefreshCw className="animate-spin mx-auto mb-4" size={48} />
-                <p>Cargando datos de Supabase...</p>
+        <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-slate-950' : 'bg-slate-900'}`}>
+            <div className="text-center">
+                <RefreshCw className="animate-spin mx-auto mb-4 text-emerald-600" size={48} />
+                <p className={`font-medium ${darkMode ? 'text-white' : 'text-white'}`}>Cargando datos de Supabase...</p>
             </div>
         </div>
       );
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans">
-      {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col fixed h-full shadow-xl z-20">
-        <div className="p-6 border-b border-slate-800">
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+    <div className={`flex min-h-screen font-sans transition-colors duration-300 ${darkMode ? 'dark bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+      
+      <Toaster 
+        position="top-right"
+        reverseOrder={false}
+        gutter={8}
+        toastOptions={{
+          duration: 4000,
+          className: darkMode ? 'bg-slate-800 text-white border border-slate-700' : '',
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+        }} 
+      />
+
+      <aside className={`w-64 flex flex-col fixed h-full shadow-xl z-20 transition-colors duration-300 border-r ${darkMode ? 'bg-slate-950 text-slate-300 border-slate-800' : 'bg-slate-900 text-slate-300'}`}>
+        <div className={`p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-800'}`}>
+          <h1 className="text-xl font-bold tracking-tight flex items-center gap-2 text-white">
             <Package className="text-emerald-500" />
             SIGIR5
           </h1>
+          
+          <button 
+            onClick={() => setDarkMode(!darkMode)}
+            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors border border-slate-700 hover:bg-slate-800 text-slate-300"
+          >
+            {darkMode ? '☀️ Modo Claro' : '🌙 Modo Oscuro'}
+          </button>
+
           <div className="mt-4 flex items-center gap-3 bg-slate-800 p-2 rounded-lg">
              <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold">
                  {user.name.charAt(0)}
@@ -1328,7 +1618,7 @@ export default function App() {
           )}
         </nav>
 
-        <div className="p-4 border-t border-slate-800 space-y-2">
+        <div className={`p-4 border-t space-y-2 ${darkMode ? 'border-slate-800' : 'border-slate-800'}`}>
             {user.role === 'admin' && (
                  <button 
                     onClick={syncInitialData} 
@@ -1344,9 +1634,8 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="ml-64 flex-1 p-8 overflow-y-auto min-h-screen">
-        {activeTab === 'dashboard' && <Dashboard products={products} categories={categories} onCategoryClick={navigateToCategory} />}
+      <main className={`ml-64 flex-1 p-8 overflow-y-auto min-h-screen transition-colors duration-300 ${darkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
+        {activeTab === 'dashboard' && <Dashboard products={products} categories={categories} onCategoryClick={navigateToCategory} darkMode={darkMode} />}
         {activeTab === 'inventory' && (
             <InventoryList 
                 products={products} 
@@ -1354,16 +1643,17 @@ export default function App() {
                 onAddProduct={addProduct}
                 onEditProduct={editProduct}
                 onDeleteProduct={deleteProduct}
+                onImport={handleImport}
                 initialCategoryFilter={null}
                 currentUser={user}
+                darkMode={darkMode}
             />
         )}
-        {activeTab === 'bajas' && user.role === 'admin' && <WriteOffModule products={products} transactions={transactions} onProcessBaja={processBaja} />}
-        {activeTab === 'replenishment' && user.role === 'admin' && <ReplenishmentModule products={products} />}
-        {activeTab === 'categories' && user.role === 'admin' && <CategoryManager categories={categories} onAddCategory={addCategory} />}
-        {activeTab === 'users' && user.role === 'admin' && <UserManagement users={users} onAddUser={addUser} currentUser={user} />}
+        {activeTab === 'bajas' && user.role === 'admin' && <WriteOffModule products={products} transactions={transactions} onProcessBaja={processBaja} darkMode={darkMode} />}
+        {activeTab === 'replenishment' && user.role === 'admin' && <ReplenishmentModule products={products} darkMode={darkMode} />}
+        {activeTab === 'categories' && user.role === 'admin' && <CategoryManager categories={categories} onAddCategory={addCategory} darkMode={darkMode} />}
+        {activeTab === 'users' && user.role === 'admin' && <UserManagement users={users} onAddUser={addUser} currentUser={user} darkMode={darkMode} />}
         
-        {/* Permission Denied Fallback */}
         {(activeTab === 'bajas' || activeTab === 'replenishment' || activeTab === 'categories' || activeTab === 'users') && user.role !== 'admin' && (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
                 <Lock size={48} className="mb-4" />
