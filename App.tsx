@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   LayoutDashboard, 
   Package, 
@@ -365,8 +365,8 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
         description: '',
         unit: 'Unidad',
         price: 0,
-        location: '', // AGREGADO
-        supplier: ''  // AGREGADO
+        location: '',
+        supplier: ''
     });
 
     useEffect(() => {
@@ -383,8 +383,8 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
                 description: '',
                 unit: 'Unidad',
                 price: 0,
-                location: '', // AGREGADO
-                supplier: ''  // AGREGADO
+                location: '',
+                supplier: ''
             });
         }
     }, [product, isOpen, categories]);
@@ -463,7 +463,7 @@ const ProductModal = ({ isOpen, onClose, product, categories, isEditMode, onSave
                         />
                     </div>
 
-                    {/* AGREGADO: UBICACIÓN Y PROVEEDOR */}
+                    {/* UBICACIÓN Y PROVEEDOR */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Ubicación</label>
@@ -690,7 +690,7 @@ const InventoryList = ({
 
   const handleRowClick = (product: Product) => {
     setSelectedProduct(product);
-    setIsEditMode(true); // CAMBIO CLAVE: Ahora abre en modo edición directo
+    setIsEditMode(true); 
     setModalOpen(true);
   };
 
@@ -893,7 +893,6 @@ const InventoryList = ({
         darkMode={darkMode}
       />
 
-      {/* El botón flotante de editar ya no es necesario porque el modal ya abre en modo edición */}
       {modalOpen && !isEditMode && currentUser.role === 'admin' && (
           <div className="fixed z-[60] bottom-10 right-10">
               <button onClick={switchToEdit} className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg flex items-center gap-2">
@@ -905,7 +904,7 @@ const InventoryList = ({
   );
 };
 
-// --- Write-Off / Salidas Module ---
+// --- PASO 2: Componente WriteOffModule Mejorado ---
 
 const WriteOffModule = ({
     products,
@@ -915,7 +914,14 @@ const WriteOffModule = ({
 }: {
     products: Product[],
     transactions: Transaction[],
-    onProcessBaja: (productId: string, qty: number, reason: string, dest?: string, receiver?: string) => void,
+    onProcessBaja: (
+        productId: string, 
+        qty: number, 
+        reason: string, 
+        dest?: string, 
+        receiver?: string,
+        attachment?: File
+    ) => void,
     darkMode: boolean
 }) => {
     const [selectedId, setSelectedId] = useState('');
@@ -924,18 +930,80 @@ const WriteOffModule = ({
     const [destination, setDestination] = useState('');
     const [receiver, setReceiver] = useState('');
     const [notes, setNotes] = useState('');
+    
+    // NUEVO: Estado para archivo adjunto
+    const [attachment, setAttachment] = useState<File | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const selectedProduct = products.find(p => p.id === selectedId);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            // Validar tamaño (máximo 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                toast.error('El archivo es demasiado grande. Máximo 10MB');
+                return;
+            }
+            
+            // Validar tipo de archivo
+            const validTypes = [
+                'application/pdf',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            ];
+            
+            if (!validTypes.includes(file.type)) {
+                toast.error('Solo se permiten archivos PDF o Word (.doc, .docx)');
+                return;
+            }
+            
+            setAttachment(file);
+            toast.success(`Archivo seleccionado: ${file.name}`);
+        }
+    };
+
+    const handleRemoveFile = () => {
+        setAttachment(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (selectedProduct && quantity > 0 && quantity <= selectedProduct.stock) {
-            onProcessBaja(selectedProduct.id, quantity, `${reason}: ${notes}`, destination, receiver);
+            onProcessBaja(
+                selectedProduct.id, 
+                quantity, 
+                `${reason}: ${notes}`, 
+                destination, 
+                receiver,
+                attachment || undefined
+            );
+            
+            // Resetear formulario
             setQuantity(1);
             setNotes('');
             setDestination('');
             setReceiver('');
+            setAttachment(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
         } 
+    };
+
+    const formatFileSize = (bytes: number): string => {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    const getFileIcon = (type?: string) => {
+        if (type?.includes('pdf')) return '📄';
+        if (type?.includes('word') || type?.includes('document')) return '📝';
+        return '📎';
     };
 
     return (
@@ -945,10 +1013,15 @@ const WriteOffModule = ({
                     <ArrowDownCircle className="text-red-500" />
                     Registrar Salida / Baja
                 </h2>
+                
                 <div className={`p-8 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                     <form onSubmit={handleSubmit} className="space-y-6">
+                        
+                        {/* Selector de Producto */}
                         <div>
-                            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Seleccionar Producto</label>
+                            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                Seleccionar Producto
+                            </label>
                             <select 
                                 className={`w-full border-slate-200 rounded-lg p-3 text-slate-700 border focus:ring-2 focus:ring-red-100 outline-none bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                                 value={selectedId}
@@ -957,21 +1030,33 @@ const WriteOffModule = ({
                             >
                                 <option value="">-- Seleccione un producto --</option>
                                 {products.filter(p => p.stock > 0).map(p => (
-                                    <option key={p.id} value={p.id}>{p.code} - {p.name} ({p.description})</option>
+                                    <option key={p.id} value={p.id}>
+                                        {p.code} - {p.name} ({p.description})
+                                    </option>
                                 ))}
                             </select>
                         </div>
 
+                        {/* Info del Producto Seleccionado */}
                         {selectedProduct && (
                             <div className={`p-4 rounded-lg border grid grid-cols-2 gap-4 text-sm ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
-                                <div><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Stock Actual:</span> <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{selectedProduct.stock} {selectedProduct.unit}</span></div>
-                                <div><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Ubicación:</span> <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{selectedProduct.location || 'N/A'}</span></div>
+                                <div>
+                                    <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Stock Actual:</span> 
+                                    <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}> {selectedProduct.stock} {selectedProduct.unit}</span>
+                                </div>
+                                <div>
+                                    <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Ubicación:</span> 
+                                    <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}> {selectedProduct.location || 'N/A'}</span>
+                                </div>
                             </div>
                         )}
 
+                        {/* Cantidad y Motivo */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Cantidad a Retirar</label>
+                                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                    Cantidad a Retirar
+                                </label>
                                 <input 
                                     type="number" 
                                     min="1" 
@@ -982,7 +1067,9 @@ const WriteOffModule = ({
                                 />
                             </div>
                             <div>
-                                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Motivo de Salida</label>
+                                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                    Motivo de Salida
+                                </label>
                                 <select 
                                     value={reason}
                                     onChange={(e) => setReason(e.target.value)}
@@ -998,13 +1085,16 @@ const WriteOffModule = ({
                             </div>
                         </div>
 
+                        {/* Datos de Entrega */}
                         <div className={`p-4 border rounded-lg space-y-4 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
                             <h4 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                 <Building2 size={16}/> Datos de Entrega
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Oficina / Departamento Destino</label>
+                                    <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                        Oficina / Departamento Destino
+                                    </label>
                                     <input 
                                         type="text" 
                                         placeholder="Ej: Contabilidad, RRHH..."
@@ -1014,7 +1104,9 @@ const WriteOffModule = ({
                                     />
                                 </div>
                                 <div>
-                                    <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Recibido por (Nombre)</label>
+                                    <label className={`block text-xs font-bold mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                        Recibido por (Nombre)
+                                    </label>
                                     <div className="relative">
                                         <UserCheck size={16} className={`absolute left-3 top-3 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}/>
                                         <input 
@@ -1029,29 +1121,101 @@ const WriteOffModule = ({
                             </div>
                         </div>
 
+                        {/* NUEVA SECCIÓN: Adjuntar Documento */}
+                        <div className={`p-5 border-2 border-dashed rounded-xl space-y-4 ${darkMode ? 'bg-slate-900 border-slate-600' : 'bg-blue-50 border-blue-300'}`}>
+                            <h4 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${darkMode ? 'text-blue-400' : 'text-blue-700'}`}>
+                                📎 Documento de Soporte (Opcional)
+                            </h4>
+                            
+                            {!attachment ? (
+                                <div className="space-y-3">
+                                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                        Adjunta un documento PDF o Word que respalde esta operación
+                                    </p>
+                                    
+                                    <input 
+                                        ref={fileInputRef}
+                                        type="file" 
+                                        accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                        onChange={handleFileChange}
+                                        className="hidden"
+                                        id="file-upload"
+                                    />
+                                    
+                                    <label 
+                                        htmlFor="file-upload"
+                                        className={`flex items-center justify-center gap-2 px-6 py-3 rounded-lg cursor-pointer transition-all font-medium text-sm border-2 ${
+                                            darkMode 
+                                                ? 'bg-slate-700 border-slate-600 text-white hover:bg-slate-600' 
+                                                : 'bg-white border-blue-400 text-blue-700 hover:bg-blue-50'
+                                        }`}
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                        </svg>
+                                        Seleccionar Archivo
+                                    </label>
+                                    
+                                    <p className={`text-xs text-center ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                        Formatos: PDF, DOC, DOCX • Tamaño máximo: 10MB
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className={`flex items-center justify-between p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-blue-200'}`}>
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-3xl">
+                                            {getFileIcon(attachment.type)}
+                                        </div>
+                                        <div>
+                                            <p className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                                {attachment.name}
+                                            </p>
+                                            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                {formatFileSize(attachment.size)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        type="button"
+                                        onClick={handleRemoveFile}
+                                        className={`p-2 rounded-lg transition ${darkMode ? 'hover:bg-slate-700 text-red-400' : 'hover:bg-red-50 text-red-600'}`}
+                                        title="Eliminar archivo"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Notas Adicionales */}
                         <div>
-                            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Notas Adicionales</label>
+                            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                Notas Adicionales
+                            </label>
                             <textarea 
                                 rows={2} 
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
                                 className={`w-full border-slate-200 rounded-lg p-3 border outline-none focus:ring-2 focus:ring-red-100 dark:bg-slate-700 dark:border-slate-600 dark:text-white`}
                                 placeholder="Detalle opcional sobre la operación..."
-                            ></textarea>
+                            />
                         </div>
 
+                        {/* Botón Submit */}
                         <button 
                             type="submit" 
                             disabled={!selectedId}
                             className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-100"
                         >
-                            Procesar Salida
+                            {attachment ? '📎 Procesar Salida con Documento' : 'Procesar Salida'}
                         </button>
                     </form>
                 </div>
             </div>
 
-            {/* History Section */}
+            {/* SECCIÓN DE HISTORIAL CON VISUALIZACIÓN DE ADJUNTOS */}
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
                     <h2 className={`text-2xl font-bold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
@@ -1083,22 +1247,63 @@ const WriteOffModule = ({
                                     <th className={`px-6 py-4 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Motivo</th>
                                     <th className={`px-6 py-4 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Destino</th>
                                     <th className={`px-6 py-4 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Recibido Por</th>
+                                    <th className={`px-6 py-4 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Documento</th>
                                 </tr>
                             </thead>
                             <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
                                 {transactions.length === 0 ? (
-                                    <tr><td colSpan={6} className={`p-8 text-center ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>No hay movimientos registrados.</td></tr>
+                                    <tr>
+                                        <td colSpan={7} className={`p-8 text-center ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                            No hay movimientos registrados.
+                                        </td>
+                                    </tr>
                                 ) : (
                                     transactions.map(tx => (
                                         <tr key={tx.id} className={`hover:${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
                                             <td className={`px-6 py-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                {new Date(tx.date).toLocaleDateString()} <span className="text-xs">{new Date(tx.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                                {new Date(tx.date).toLocaleDateString()} 
+                                                <span className="text-xs block">{new Date(tx.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                             </td>
-                                            <td className={`px-6 py-4 font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>{tx.productName}</td>
+                                            <td className={`px-6 py-4 font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                                {tx.productName}
+                                            </td>
                                             <td className="px-6 py-4 font-bold text-red-600">-{tx.quantity}</td>
-                                            <td className={`px-6 py-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{tx.reason}</td>
-                                            <td className={`px-6 py-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{tx.destination || '-'}</td>
-                                            <td className={`px-6 py-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{tx.receiver || '-'}</td>
+                                            <td className={`px-6 py-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                                {tx.reason}
+                                            </td>
+                                            <td className={`px-6 py-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                                {tx.destination || '-'}
+                                            </td>
+                                            <td className={`px-6 py-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                                {tx.receiver || '-'}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {tx.attachmentUrl ? (
+                                                    <a 
+                                                        href={tx.attachmentUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                                                            darkMode 
+                                                                ? 'bg-blue-900 text-blue-300 hover:bg-blue-800' 
+                                                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                                        }`}
+                                                        title={tx.attachmentName}
+                                                    >
+                                                        {getFileIcon(tx.attachmentType)}
+                                                        <span className="max-w-[100px] truncate">
+                                                            {tx.attachmentName}
+                                                        </span>
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                        </svg>
+                                                    </a>
+                                                ) : (
+                                                    <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                        Sin adjunto
+                                                    </span>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))
                                 )}
@@ -1507,7 +1712,15 @@ export default function App() {
     }
   };
 
-  const processBaja = async (productId: string, qty: number, reason: string, destination?: string, receiver?: string) => {
+  // --- PASO 3: Función processBaja Mejorada ---
+  const processBaja = async (
+    productId: string, 
+    qty: number, 
+    reason: string, 
+    destination?: string, 
+    receiver?: string,
+    attachment?: File
+) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
@@ -1516,44 +1729,94 @@ export default function App() {
         return;
     }
 
-    const newStock = product.stock - qty;
-    setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: newStock } : p));
-    await supabase.from('products').update({ stock: newStock }).eq('id', productId);
+    toast.loading('Procesando salida...', { id: 'process-baja' });
 
-    const newTx: Transaction = {
-        id: `tx_${Date.now()}`,
-        productId,
-        productName: product.name,
-        type: TransactionType.OUT,
-        quantity: qty,
-        date: new Date().toISOString(),
-        reason,
-        user: user?.username || 'Unknown',
-        destination,
-        receiver
-    };
-    
-    setTransactions(prev => [newTx, ...prev]);
-    const { error: txError } = await supabase.from('transactions').insert(newTx);
-    if (txError) console.warn('Transacción no guardada:', txError);
-    
-    toast.success(`Salida registrada: -${qty} ${product.unit}`, {
-        icon: '📦',
-        style: {
-            border: '1px solid #10b981',
-            padding: '16px',
-            color: '#064e3b',
-        },
-    });
+    try {
+        // 1. Actualizar Stock
+        const newStock = product.stock - qty;
+        setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: newStock } : p));
+        await supabase.from('products').update({ stock: newStock }).eq('id', productId);
 
-    logAudit('STOCK_OUT', { 
-        id: product.id, 
-        name: product.name, 
-        quantity: qty, 
-        new_stock: newStock,
-        reason: reason 
-    }, user);
-  };
+        // 2. Subir archivo si existe
+        let attachmentUrl = '';
+        let attachmentName = '';
+        let attachmentType = '';
+        let attachmentSize = 0;
+
+        if (attachment && supabase.storage) {
+            const fileExt = attachment.name.split('.').pop();
+            const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+            const filePath = `transaction-attachments/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('documents') // Asegúrate de crear este bucket en Supabase
+                .upload(filePath, attachment);
+
+            if (uploadError) {
+                console.error('Error subiendo archivo:', uploadError);
+                toast.error('Error al subir el documento adjunto');
+            } else {
+                // Obtener URL pública
+                const { data: urlData } = supabase.storage
+                    .from('documents')
+                    .getPublicUrl(filePath);
+
+                attachmentUrl = urlData.publicUrl;
+                attachmentName = attachment.name;
+                attachmentType = attachment.type;
+                attachmentSize = attachment.size;
+                
+                toast.success('Documento adjunto subido correctamente', { icon: '📎' });
+            }
+        }
+
+        // 3. Crear transacción
+        const newTx: Transaction = {
+            id: `tx_${Date.now()}`,
+            productId,
+            productName: product.name,
+            type: TransactionType.OUT,
+            quantity: qty,
+            date: new Date().toISOString(),
+            reason,
+            user: user?.username || 'Unknown',
+            destination,
+            receiver,
+            attachmentName,
+            attachmentUrl,
+            attachmentType,
+            attachmentSize
+        };
+        
+        setTransactions(prev => [newTx, ...prev]);
+        
+        const { error: txError } = await supabase.from('transactions').insert(newTx);
+        if (txError) {
+            console.warn('Transacción no guardada:', txError);
+        }
+        
+        toast.dismiss('process-baja');
+        toast.success(`Salida registrada: -${qty} ${product.unit}`, {
+            icon: '📦',
+            duration: 5000,
+        });
+
+        // Log de auditoría
+        logAudit('STOCK_OUT', { 
+            id: product.id, 
+            name: product.name, 
+            quantity: qty, 
+            new_stock: newStock,
+            reason: reason,
+            hasAttachment: !!attachment
+        }, user);
+
+    } catch (error) {
+        toast.dismiss('process-baja');
+        console.error('Error procesando baja:', error);
+        toast.error('Error al procesar la salida');
+    }
+};
 
   const addCategory = async (name: string, description: string) => {
     const newCat: Category = { id: `cat_${Date.now()}`, name, description };
