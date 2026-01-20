@@ -46,10 +46,15 @@ export interface Transaction {
   type: TransactionType;
   quantity: number;
   date: string;
-  reason?: string;
-  user?: string;
+  reason: string;
+  user: string;
   destination?: string;
   receiver?: string;
+  // NUEVOS CAMPOS PARA ARCHIVOS
+  attachmentName?: string;
+  attachmentUrl?: string;
+  attachmentType?: string;
+  attachmentSize?: number;
 }
 
 export type UserRole = 'admin' | 'viewer';
